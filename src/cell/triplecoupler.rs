@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use parking_lot_rt::{Condvar, Mutex};
 
-#[derive(Default)]
 struct CellValue<P, S, T> {
     primary: Option<P>,
     second: Option<S>,
@@ -11,13 +10,11 @@ struct CellValue<P, S, T> {
     closed: bool,
 }
 
-#[derive(Default)]
 struct TripleCouplerInner<P, S, T> {
     value: Mutex<CellValue<P, S, T>>,
     data_available: Condvar,
 }
 
-#[derive(Default)]
 /// Data coupler, which combines [`crate::cell::DataCell`] functionality with two additional data
 /// value. The primary value is combined with the secondary, the secondary may not be present.
 pub struct TripleCoupler<P, S, T> {
@@ -32,7 +29,27 @@ impl<P, S, T> Clone for TripleCoupler<P, S, T> {
     }
 }
 
+impl<P, S, T> Default for TripleCoupler<P, S, T> {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new(TripleCouplerInner {
+                value: Mutex::new(CellValue {
+                    primary: None,
+                    second: None,
+                    third: None,
+                    closed: false,
+                }),
+                data_available: Condvar::new(),
+            }),
+        }
+    }
+}
+
 impl<P, S, T> TripleCoupler<P, S, T> {
+    /// Creates a new triple coupler
+    pub fn new() -> Self {
+        Self::default()
+    }
     /// Closes the cell, preventing any further data from being retrieved
     pub fn close(&self) {
         let mut value = self.inner.value.lock();

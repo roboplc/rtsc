@@ -3,23 +3,34 @@ use std::sync::Arc;
 
 use parking_lot_rt::{Condvar, Mutex};
 
-#[derive(Default)]
 struct CellValue<P> {
     current: Option<P>,
     closed: bool,
 }
 
-#[derive(Default)]
 struct DataCellInner<P> {
     value: Mutex<CellValue<P>>,
     data_available: Condvar,
 }
 
-#[derive(Default)]
 /// A simple data cell that can be used to pass data between threads. Acts similarly to a
 /// ring-buffer channel with a capacity of 1.
 pub struct DataCell<P> {
     inner: Arc<DataCellInner<P>>,
+}
+
+impl<P> Default for DataCell<P> {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new(DataCellInner {
+                value: Mutex::new(CellValue {
+                    current: None,
+                    closed: false,
+                }),
+                data_available: Condvar::new(),
+            }),
+        }
+    }
 }
 
 impl<P> Clone for DataCell<P> {
@@ -31,6 +42,10 @@ impl<P> Clone for DataCell<P> {
 }
 
 impl<P> DataCell<P> {
+    /// Creates a new data cell
+    pub fn new() -> Self {
+        Self::default()
+    }
     /// Closes the cell, preventing any further data from being retrieved
     pub fn close(&self) {
         let mut value = self.inner.value.lock();
