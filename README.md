@@ -1,7 +1,7 @@
 <h2>
   RTSC - Real-time Synchronization Components
-  <a href="https://crates.io/crates/roboplc"><img alt="crates.io page" src="https://img.shields.io/crates/v/roboplc.svg"></img></a>
-  <a href="https://docs.rs/roboplc"><img alt="docs.rs page" src="https://docs.rs/roboplc/badge.svg"></img></a>
+  <a href="https://crates.io/crates/rtsc"><img alt="crates.io page" src="https://img.shields.io/crates/v/rtsc.svg"></img></a>
+  <a href="https://docs.rs/rtsc"><img alt="docs.rs page" src="https://docs.rs/rtsc/badge.svg"></img></a>
 </h2>
 
 Requirements for data synchronization in real-time applications differ from
