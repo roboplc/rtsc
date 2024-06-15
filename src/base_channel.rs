@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 
-use crate::{Error, Result};
+use crate::{ddp::StorageTryPushOutput, Error, Result};
 use object_id::UniqueId;
 use parking_lot_rt::{Condvar, Mutex};
 
@@ -20,16 +20,6 @@ pub trait ChannelStorage<T: Sized> {
     fn is_full(&self) -> bool;
     /// Returns true if the storage is empty
     fn is_empty(&self) -> bool;
-}
-
-/// Result payload of try_push operation
-pub enum StorageTryPushOutput<T: Sized> {
-    /// the value is pushed
-    Pushed,
-    /// the value is skipped
-    Skipped,
-    /// the value has been skipped
-    Full(T),
 }
 
 /// An abstract trait for data channels and hubs

@@ -4,19 +4,25 @@
 pub mod buf;
 /// Cell synchronization
 pub mod cell;
+/// Channel
+pub mod channel;
+/// Policy-based channel
+pub mod pchannel;
 /// Semaphore
 pub mod semaphore;
 /// Time tools
 pub mod time;
 /// Locking primitives
 pub use parking_lot_rt as locking;
+/// Policy-based deque
+pub mod pdeque;
 
 mod base_channel;
+mod ddp;
+
+pub use ddp::{DataDeliveryPolicy, DeliveryPolicy, StorageTryPushOutput};
 
 pub use base_channel::DataChannel;
-
-/// Channel
-pub mod channel;
 
 /// Error type
 #[derive(thiserror::Error, Debug)]
@@ -40,6 +46,9 @@ pub enum Error {
     /// Timeouts
     #[error("timed out")]
     Timeout,
+    /// Invalid data receied / parameters provided
+    #[error("Invalid data")]
+    InvalidData(String),
 }
 
 /// Result type

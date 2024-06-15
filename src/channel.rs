@@ -1,7 +1,8 @@
 use std::collections::VecDeque;
 
-use crate::base_channel::{
-    make_channel, BaseChannel, BaseReceiver, BaseSender, ChannelStorage, StorageTryPushOutput,
+use crate::{
+    base_channel::{make_channel, BaseChannel, BaseReceiver, BaseSender, ChannelStorage},
+    StorageTryPushOutput,
 };
 
 impl<T> ChannelStorage<T> for VecDeque<T>
@@ -18,7 +19,7 @@ where
         VecDeque::with_capacity(capacity)
     }
 
-    fn try_push(&mut self, value: T) -> crate::base_channel::StorageTryPushOutput<T> {
+    fn try_push(&mut self, value: T) -> StorageTryPushOutput<T> {
         if self.len() == self.capacity() {
             StorageTryPushOutput::Full(value)
         } else {
