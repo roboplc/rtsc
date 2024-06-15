@@ -93,3 +93,8 @@ pub enum StorageTryPushOutput<T: Sized> {
     /// the value has been skipped
     Full(T),
 }
+
+impl DataDeliveryPolicy for () {}
+impl DataDeliveryPolicy for usize {}
+impl DataDeliveryPolicy for String {}
+impl<T> DataDeliveryPolicy for Vec<T> {}
