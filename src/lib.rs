@@ -26,7 +26,7 @@ pub use base_channel::DataChannel;
 pub use rtsc_derive::DataPolicy;
 
 /// Error type
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, PartialEq, Eq)]
 pub enum Error {
     /// the channel is full and the value can not be sent
     #[error("channel full")]
@@ -50,6 +50,9 @@ pub enum Error {
     /// Invalid data receied / parameters provided
     #[error("Invalid data")]
     InvalidData(String),
+    /// All other errors
+    #[error("operation failed: {0}")]
+    Failed(String),
 }
 
 /// Result type
