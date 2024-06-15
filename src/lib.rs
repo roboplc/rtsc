@@ -23,6 +23,8 @@ mod base_channel;
 
 pub use base_channel::DataChannel;
 
+pub use rtsc_derive::DataPolicy;
+
 /// Error type
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
