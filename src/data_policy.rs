@@ -1,7 +1,7 @@
 use core::fmt;
 use std::{mem, str::FromStr};
 
-use crate::{Result, Error};
+use crate::{Error, Result};
 
 /// Data delivery policies, used by [`crate::pdeque::Deque`]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
