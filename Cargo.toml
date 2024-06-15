@@ -11,6 +11,7 @@ readme = "README.md"
 
 [dependencies]
 bma-ts = "0.1.12"
+object-id = "0.1.4"
 parking_lot_rt = "0.12.1"
 thiserror = "1.0.61"
 
