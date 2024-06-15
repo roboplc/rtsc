@@ -1,0 +1,79 @@
+use crate::{Error, Result};
+use std::sync::Arc;
+
+use parking_lot_rt::{Condvar, Mutex};
+
+#[derive(Default)]
+struct CellValue<P> {
+    current: Option<P>,
+    closed: bool,
+}
+
+#[derive(Default)]
+struct DataCellInner<P> {
+    value: Mutex<CellValue<P>>,
+    data_available: Condvar,
+}
+
+#[derive(Default)]
+/// A simple data cell that can be used to pass data between threads. Acts similarly to a
+/// ring-buffer channel with a capacity of 1.
+pub struct DataCell<P> {
+    inner: Arc<DataCellInner<P>>,
+}
+
+impl<P> Clone for DataCell<P> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<P> DataCell<P> {
+    /// Closes the cell, preventing any further data from being retrieved
+    pub fn close(&self) {
+        let mut value = self.inner.value.lock();
+        value.closed = true;
+        self.inner.data_available.notify_all();
+    }
+    /// Returns true if the data cell is closed
+    pub fn is_closed(&self) -> bool {
+        let value = self.inner.value.lock();
+        value.closed
+    }
+    /// Sets the data in the cell
+    pub fn set(&self, data: P) {
+        let mut value = self.inner.value.lock();
+        value.current = Some(data);
+        self.inner.data_available.notify_one();
+    }
+    /// Retrieves the data from the cell
+    pub fn get(&self) -> Result<P> {
+        let mut value = self.inner.value.lock();
+        if value.closed {
+            return Err(Error::ChannelClosed);
+        }
+        loop {
+            if let Some(current) = value.current.take() {
+                return Ok(current);
+            }
+            self.inner.data_available.wait(&mut value);
+        }
+    }
+    /// Tries to retrieve the data from the cell (non-blocking)
+    pub fn try_get(&self) -> Result<P> {
+        let mut value = self.inner.value.lock();
+        if value.closed {
+            return Err(Error::ChannelClosed);
+        }
+        value.current.take().ok_or(Error::ChannelEmpty)
+    }
+}
+
+impl<P> Iterator for DataCell<P> {
+    type Item = P;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.get().ok()
+    }
+}
