@@ -18,8 +18,8 @@ struct TripleCouplerInner<P, S, T> {
 }
 
 #[derive(Default)]
-/// Data coupler, which combines [`DataCell`] functionality with two additional data value.
-/// The primary value is combined with the secondary, the secondary may not be present.
+/// Data coupler, which combines [`crate::cell::DataCell`] functionality with two additional data
+/// value. The primary value is combined with the secondary, the secondary may not be present.
 pub struct TripleCoupler<P, S, T> {
     inner: Arc<TripleCouplerInner<P, S, T>>,
 }

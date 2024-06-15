@@ -17,8 +17,8 @@ struct CouplerInner<P, S> {
 }
 
 #[derive(Default)]
-/// Data coupler, which combines [`DataCell`] functionality with a secondary data value.
-/// The primary value is combined with the secondary, the secondary may not be present.
+/// Data coupler, which combines [`crate::cell::DataCell`] functionality with a secondary data
+/// value. The primary value is combined with the secondary, the secondary may not be present.
 pub struct Coupler<P, S> {
     inner: Arc<CouplerInner<P, S>>,
 }
