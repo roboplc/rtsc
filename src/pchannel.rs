@@ -51,6 +51,15 @@ where
     make_channel(ch)
 }
 
+/// Create a new bounded+ordered channel
+pub fn ordered<T>(capacity: usize) -> (Sender<T>, Receiver<T>)
+where
+    T: DataDeliveryPolicy,
+{
+    let ch = BaseChannel::new(capacity, true);
+    make_channel(ch)
+}
+
 #[cfg(test)]
 mod test {
     use std::{thread, time::Duration};
