@@ -1,6 +1,7 @@
 use crate::{
     base_channel::{make_channel, BaseChannel, BaseReceiver, BaseSender, ChannelStorage},
-    pdeque, DataDeliveryPolicy, StorageTryPushOutput,
+    data_policy::{DataDeliveryPolicy, StorageTryPushOutput},
+    pdeque,
 };
 
 impl<T> ChannelStorage<T> for pdeque::Deque<T>
@@ -54,7 +55,10 @@ where
 mod test {
     use std::{thread, time::Duration};
 
-    use crate::{DataDeliveryPolicy, DeliveryPolicy, Error};
+    use crate::{
+        data_policy::{DataDeliveryPolicy, DeliveryPolicy},
+        Error,
+    };
 
     use super::bounded;
 

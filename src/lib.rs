@@ -6,6 +6,8 @@ pub mod buf;
 pub mod cell;
 /// Channel
 pub mod channel;
+/// Data policies
+pub mod data_policy;
 /// Policy-based channel
 pub mod pchannel;
 /// Semaphore
@@ -18,9 +20,6 @@ pub use parking_lot_rt as locking;
 pub mod pdeque;
 
 mod base_channel;
-mod ddp;
-
-pub use ddp::{DataDeliveryPolicy, DeliveryPolicy, StorageTryPushOutput};
 
 pub use base_channel::DataChannel;
 

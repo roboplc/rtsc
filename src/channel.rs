@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use crate::{
     base_channel::{make_channel, BaseChannel, BaseReceiver, BaseSender, ChannelStorage},
-    StorageTryPushOutput,
+    data_policy::StorageTryPushOutput,
 };
 
 impl<T> ChannelStorage<T> for VecDeque<T>
@@ -13,9 +13,7 @@ where
     where
         Self: Sized,
     {
-        if ordering {
-            panic!("Ordering is not supported for VecDeque");
-        }
+        assert!(!ordering, "Ordering is not supported for VecDeque");
         VecDeque::with_capacity(capacity)
     }
 
