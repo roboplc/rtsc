@@ -107,3 +107,52 @@ impl<P, S, T> Iterator for TripleCoupler<P, S, T> {
         self.get().ok()
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    use crate::Error;
+
+    use super::TripleCoupler;
+    use std::{thread, time::Duration};
+
+    #[test]
+    fn test_coupler() {
+        let cell = TripleCoupler::new();
+        let cell2 = cell.clone();
+        let handle = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(100));
+            cell2.set_second(33);
+            cell2.set_third(45);
+            cell2.set(42);
+        });
+        assert_eq!(cell.get().unwrap(), (42, Some(33), Some(45)));
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_coupler_close() {
+        let cell = TripleCoupler::<usize, usize, usize>::new();
+        let cell2 = cell.clone();
+        let handle = thread::spawn(move || {
+            cell2.set(42);
+        });
+        cell.close();
+        assert_eq!(cell.get().unwrap_err(), Error::ChannelClosed);
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_coupler_try_get() {
+        let cell = TripleCoupler::new();
+        assert_eq!(cell.try_get().unwrap_err(), Error::ChannelEmpty);
+        let cell2 = cell.clone();
+        let handle = thread::spawn(move || {
+            cell2.set_second(33);
+            cell2.set_third(45);
+            cell2.set(42);
+        });
+        handle.join().unwrap();
+        assert_eq!(cell.try_get().unwrap(), (42, Some(33), Some(45)));
+    }
+}

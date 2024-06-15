@@ -92,3 +92,49 @@ impl<P> Iterator for DataCell<P> {
         self.get().ok()
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    use std::{thread, time::Duration};
+
+    use crate::Error;
+
+    use super::DataCell;
+
+    #[test]
+    fn test_datacell() {
+        let cell = DataCell::new();
+        let cell2 = cell.clone();
+        let handle = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(100));
+            cell2.set(42);
+        });
+        assert_eq!(cell.get().unwrap(), 42);
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_datacell_close() {
+        let cell = DataCell::new();
+        let cell2 = cell.clone();
+        let handle = thread::spawn(move || {
+            cell2.set(42);
+        });
+        cell.close();
+        assert_eq!(cell.get().unwrap_err(), Error::ChannelClosed);
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_datacell_try_get() {
+        let cell = DataCell::new();
+        assert_eq!(cell.try_get().unwrap_err(), Error::ChannelEmpty);
+        let cell2 = cell.clone();
+        let handle = thread::spawn(move || {
+            cell2.set(42);
+        });
+        handle.join().unwrap();
+        assert_eq!(cell.try_get().unwrap(), 42);
+    }
+}

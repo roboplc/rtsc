@@ -106,3 +106,50 @@ impl<P, S> Iterator for Coupler<P, S> {
         self.get().ok()
     }
 }
+
+#[cfg(test)]
+mod test {
+
+    use crate::Error;
+
+    use super::Coupler;
+    use std::{thread, time::Duration};
+
+    #[test]
+    fn test_coupler() {
+        let cell = Coupler::new();
+        let cell2 = cell.clone();
+        let handle = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(100));
+            cell2.set_second(33);
+            cell2.set(42);
+        });
+        assert_eq!(cell.get().unwrap(), (42, Some(33)));
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_coupler_close() {
+        let cell = Coupler::<usize, usize>::new();
+        let cell2 = cell.clone();
+        let handle = thread::spawn(move || {
+            cell2.set(42);
+        });
+        cell.close();
+        assert_eq!(cell.get().unwrap_err(), Error::ChannelClosed);
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_coupler_try_get() {
+        let cell = Coupler::new();
+        assert_eq!(cell.try_get().unwrap_err(), Error::ChannelEmpty);
+        let cell2 = cell.clone();
+        let handle = thread::spawn(move || {
+            cell2.set_second(33);
+            cell2.set(42);
+        });
+        handle.join().unwrap();
+        assert_eq!(cell.try_get().unwrap(), (42, Some(33)));
+    }
+}
