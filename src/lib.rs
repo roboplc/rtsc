@@ -4,12 +4,16 @@
 pub mod buf;
 /// Cell synchronization
 pub mod cell;
-/// Channel
+/// Sync channel
 pub mod channel;
+/// Async channel
+pub mod channel_async;
 /// Data policies
 pub mod data_policy;
-/// Policy-based channel
+/// Policy-based sync channel
 pub mod pchannel;
+/// Policy-based async channel
+pub mod pchannel_async;
 /// Semaphore
 pub mod semaphore;
 /// Time tools
@@ -20,6 +24,7 @@ pub use parking_lot_rt as locking;
 pub mod pdeque;
 
 mod base_channel;
+mod base_channel_async;
 
 pub use base_channel::DataChannel;
 

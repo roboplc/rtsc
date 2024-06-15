@@ -42,7 +42,12 @@ pub type Sender<T> = BaseSender<T, pdeque::Deque<T>>;
 /// Channel receiver
 pub type Receiver<T> = BaseReceiver<T, pdeque::Deque<T>>;
 
-/// Create a new bounded channel
+/// Creates a bounded sync channel which respects [`DataDeliveryPolicy`] rules with no message
+/// priority ordering
+///
+/// # Panics
+///
+/// Will panic if the capacity is zero
 pub fn bounded<T>(capacity: usize) -> (Sender<T>, Receiver<T>)
 where
     T: DataDeliveryPolicy,
@@ -51,7 +56,12 @@ where
     make_channel(ch)
 }
 
-/// Create a new bounded+ordered channel
+/// Creates a bounded channel which respects [`DataDeliveryPolicy`] rules and has got message
+/// priority ordering turned on
+///
+/// # Panics
+///
+/// Will panic if the capacity is zero
 pub fn ordered<T>(capacity: usize) -> (Sender<T>, Receiver<T>)
 where
     T: DataDeliveryPolicy,

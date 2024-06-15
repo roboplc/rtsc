@@ -50,6 +50,10 @@ pub type Sender<T> = BaseSender<T, VecDeque<T>>;
 pub type Receiver<T> = BaseReceiver<T, VecDeque<T>>;
 
 /// Create a new bounded channel
+///
+/// # Panics
+///
+/// Will panic if the capacity is zero
 pub fn bounded<T>(capacity: usize) -> (Sender<T>, Receiver<T>) {
     let ch = BaseChannel::new(capacity, false);
     make_channel(ch)
