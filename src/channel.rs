@@ -31,15 +31,15 @@ where
     }
 
     fn len(&self) -> usize {
-        self.len()
+        Self::len(self)
     }
 
     fn is_full(&self) -> bool {
-        self.len() == self.capacity()
+        Self::len(self) == self.capacity()
     }
 
     fn is_empty(&self) -> bool {
-        self.is_empty()
+        Self::is_empty(self)
     }
 }
 
