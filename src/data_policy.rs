@@ -88,9 +88,9 @@ where
 pub enum StorageTryPushOutput<T: Sized> {
     /// the value is pushed
     Pushed,
-    /// the value is skipped
-    Skipped,
     /// the value has been skipped
+    Skipped,
+    /// the value has been returned back, usually because the buffer is full
     Full(T),
 }
 
