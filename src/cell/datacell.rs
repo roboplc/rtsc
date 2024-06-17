@@ -63,6 +63,13 @@ impl<P> DataCell<P> {
         value.current = Some(data);
         self.inner.data_available.notify_one();
     }
+    /// Replaces the value in the cell and returns the old one if any
+    pub fn replace(&self, data: P) -> Option<P> {
+        let mut value = self.inner.value.lock();
+        let prev = value.current.replace(data);
+        self.inner.data_available.notify_one();
+        prev
+    }
     /// Retrieves the data from the cell
     pub fn get(&self) -> Result<P> {
         let mut value = self.inner.value.lock();

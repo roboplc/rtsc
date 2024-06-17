@@ -67,15 +67,32 @@ impl<P, S, T> TripleCoupler<P, S, T> {
         value.primary = Some(data);
         self.inner.data_available.notify_one();
     }
+    /// Replaces the primary value and returns the old one if any
+    pub fn replace(&self, data: P) -> Option<P> {
+        let mut value = self.inner.value.lock();
+        let prev = value.primary.replace(data);
+        self.inner.data_available.notify_one();
+        prev
+    }
     /// Sets the second value
     pub fn set_second(&self, data: S) {
         let mut value = self.inner.value.lock();
         value.second = Some(data);
     }
+    /// Replaces the second value and returns the old one if any
+    pub fn replace_second(&self, data: S) -> Option<S> {
+        let mut value = self.inner.value.lock();
+        value.second.replace(data)
+    }
     /// Retrieves the primary and secondary values from the cell
     pub fn set_third(&self, data: T) {
         let mut value = self.inner.value.lock();
         value.third = Some(data);
+    }
+    /// Replaces the third value and returns the old one if any
+    pub fn replace_third(&self, data: T) -> Option<T> {
+        let mut value = self.inner.value.lock();
+        value.third.replace(data)
     }
     /// Retrieves the primary and secondary values from the cell
     pub fn get(&self) -> Result<(P, Option<S>, Option<T>)> {
