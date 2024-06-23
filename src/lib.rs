@@ -18,8 +18,12 @@ pub mod pchannel_async;
 pub mod semaphore;
 /// Time tools
 pub mod time;
+/// Timestamps
+pub use bma_ts;
 /// Locking primitives
 pub use parking_lot_rt as locking;
+/// Time-limited operations
+pub mod ops;
 /// Policy-based deque
 pub mod pdeque;
 
