@@ -9,6 +9,7 @@ use std::{
         Arc,
     },
     task::{Context, Poll, Waker},
+    time::Duration,
 };
 
 use crate::{base_channel::ChannelStorage, data_policy::StorageTryPushOutput, Error, Result};
@@ -18,6 +19,7 @@ use pin_project::{pin_project, pinned_drop};
 
 type ClientId = usize;
 
+/// Base async channel
 pub struct BaseChannelAsync<T: Sized, S: ChannelStorage<T>>(Arc<ChannelInner<T, S>>);
 
 impl<T: Sized, S: ChannelStorage<T>> BaseChannelAsync<T, S> {
@@ -274,6 +276,7 @@ where
     }
 }
 
+/// Base async sender
 #[derive(Eq, PartialEq)]
 pub struct BaseSenderAsync<T, S>
 where
@@ -288,6 +291,7 @@ where
     T: Sized,
     S: ChannelStorage<T>,
 {
+    /// Sends a value to the channel
     #[inline]
     pub fn send(&self, value: T) -> impl Future<Output = Result<()>> + '_ {
         Send {
@@ -297,6 +301,7 @@ where
             value: Some(value),
         }
     }
+    /// Tries to send a value to the channel
     pub fn try_send(&self, value: T) -> Result<()> {
         let mut pc = self.channel.0.data.lock();
         if pc.receivers == 0 {
@@ -311,6 +316,7 @@ where
             StorageTryPushOutput::Full(_) => Err(Error::ChannelFull),
         }
     }
+    /// Sends a value to the channel in a blocking (synchronous) way
     pub fn send_blocking(&self, mut value: T) -> Result<()> {
         let mut pc = self.channel.0.data.lock();
         let pushed = loop {
@@ -332,18 +338,52 @@ where
             StorageTryPushOutput::Full(_) => unreachable!(),
         }
     }
+    /// Sends a value to the channel in a blocking (synchronous) way with a given tiemout
+    pub fn send_blocking_timeout(&self, mut value: T, timeout: Duration) -> Result<()> {
+        let mut pc = self.channel.0.data.lock();
+        let pushed = loop {
+            if pc.receivers == 0 {
+                return Err(Error::ChannelClosed);
+            }
+            let push_result = pc.queue.try_push(value);
+            let StorageTryPushOutput::Full(val) = push_result else {
+                break push_result;
+            };
+            value = val;
+            pc.append_send_sync_waker();
+            if self
+                .channel
+                .0
+                .space_available
+                .wait_for(&mut pc, timeout)
+                .timed_out()
+            {
+                return Err(Error::Timeout);
+            }
+        };
+        pc.wake_next_recv();
+        match pushed {
+            StorageTryPushOutput::Pushed => Ok(()),
+            StorageTryPushOutput::Skipped => Err(Error::ChannelSkipped),
+            StorageTryPushOutput::Full(_) => unreachable!(),
+        }
+    }
+    /// Returns the number of items in the channel
     #[inline]
     pub fn len(&self) -> usize {
         self.channel.0.data.lock().queue.len()
     }
+    /// Returns true if the channel is full
     #[inline]
     pub fn is_full(&self) -> bool {
         self.channel.0.data.lock().queue.is_full()
     }
+    /// Returns true if the channel is empty
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.channel.0.data.lock().queue.is_empty()
     }
+    /// Returns true if the channel is still alive
     #[inline]
     pub fn is_alive(&self) -> bool {
         self.channel.0.data.lock().receivers > 0
@@ -418,6 +458,7 @@ where
     }
 }
 
+/// Base async receiver
 #[derive(Eq, PartialEq)]
 pub struct BaseReceiverAsync<T, S>
 where
@@ -432,6 +473,7 @@ where
     T: Sized,
     S: ChannelStorage<T>,
 {
+    /// Receives a value from the channel
     #[inline]
     pub fn recv(&self) -> impl Future<Output = Result<T>> + '_ {
         Recv {
@@ -440,6 +482,7 @@ where
             queued: false,
         }
     }
+    /// Tries to receive a value from the channel
     pub fn try_recv(&self) -> Result<T> {
         let mut pc = self.channel.0.data.lock();
         if let Some(val) = pc.queue.get() {
@@ -451,6 +494,7 @@ where
             Err(Error::ChannelEmpty)
         }
     }
+    /// Receives a value from the channel in a blocking (synchronous) way
     pub fn recv_blocking(&self) -> Result<T> {
         let mut pc = self.channel.0.data.lock();
         loop {
@@ -464,18 +508,44 @@ where
             self.channel.0.data_available.wait(&mut pc);
         }
     }
+    /// Receives a value from the channel in a blocking (synchronous) way with a given timeout
+    pub fn recv_blocking_timeout(&self, timeout: Duration) -> Result<T> {
+        let mut pc = self.channel.0.data.lock();
+        loop {
+            if let Some(val) = pc.queue.get() {
+                pc.wake_next_send();
+                return Ok(val);
+            } else if pc.senders == 0 {
+                return Err(Error::ChannelClosed);
+            }
+            pc.append_recv_sync_waker();
+            if self
+                .channel
+                .0
+                .data_available
+                .wait_for(&mut pc, timeout)
+                .timed_out()
+            {
+                return Err(Error::Timeout);
+            }
+        }
+    }
+    /// Returns the number of items in the channel
     #[inline]
     pub fn len(&self) -> usize {
         self.channel.0.data.lock().queue.len()
     }
+    /// Returns true if the channel is full
     #[inline]
     pub fn is_full(&self) -> bool {
         self.channel.0.data.lock().queue.is_full()
     }
+    /// Returns true if the channel is empty
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.channel.0.data.lock().queue.is_empty()
     }
+    /// Returns true if the channel is still alive
     #[inline]
     pub fn is_alive(&self) -> bool {
         self.channel.0.data.lock().senders > 0
