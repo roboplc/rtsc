@@ -1,5 +1,5 @@
 use crate::{Error, Result};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use parking_lot_rt::{Condvar, Mutex};
 
@@ -105,6 +105,26 @@ impl<P, S, T> TripleCoupler<P, S, T> {
                 return Ok((primary, value.second.take(), value.third.take()));
             }
             self.inner.data_available.wait(&mut value);
+        }
+    }
+    /// Retrieves the primary and secondary values from the cell with the given timeout
+    pub fn get_timeout(&self, timeout: Duration) -> Result<(P, Option<S>, Option<T>)> {
+        let mut value = self.inner.value.lock();
+        if value.closed {
+            return Err(Error::ChannelClosed);
+        }
+        loop {
+            if let Some(primary) = value.primary.take() {
+                return Ok((primary, value.second.take(), value.third.take()));
+            }
+            if self
+                .inner
+                .data_available
+                .wait_for(&mut value, timeout)
+                .timed_out()
+            {
+                return Err(Error::Timeout);
+            }
         }
     }
     /// Tries to retrieve the data from the cell (non-blocking)

@@ -1,5 +1,5 @@
 use crate::{Error, Result};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use parking_lot_rt::{Condvar, Mutex};
 
@@ -81,6 +81,26 @@ impl<P> DataCell<P> {
                 return Ok(current);
             }
             self.inner.data_available.wait(&mut value);
+        }
+    }
+    /// Retrieves the data from the cell with the given timeout
+    pub fn get_timeout(&self, timeout: Duration) -> Result<P> {
+        let mut value = self.inner.value.lock();
+        if value.closed {
+            return Err(Error::ChannelClosed);
+        }
+        loop {
+            if let Some(current) = value.current.take() {
+                return Ok(current);
+            }
+            if self
+                .inner
+                .data_available
+                .wait_for(&mut value, timeout)
+                .timed_out()
+            {
+                return Err(Error::Timeout);
+            }
         }
     }
     /// Tries to retrieve the data from the cell (non-blocking)
