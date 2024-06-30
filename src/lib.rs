@@ -22,13 +22,14 @@ pub mod time;
 pub use bma_ts;
 /// Locking primitives
 pub use parking_lot_rt as locking;
+/// Base channel type, allows to build sync channels with a custom storage
+pub mod base_channel;
+/// Base async channel type, allows to build async channels with a custom storage
+pub mod base_channel_async;
 /// Time-limited operations
 pub mod ops;
 /// Policy-based deque
 pub mod pdeque;
-
-mod base_channel;
-mod base_channel_async;
 
 pub use base_channel::DataChannel;
 
