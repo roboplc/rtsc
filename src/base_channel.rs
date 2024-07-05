@@ -1,8 +1,8 @@
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 
+use crate::locking::{Condvar, Mutex};
 use crate::{data_policy::StorageTryPushOutput, Error, Result};
 use object_id::UniqueId;
-use parking_lot_rt::{Condvar, Mutex};
 
 /// Channel storage trait
 pub trait ChannelStorage<T: Sized> {

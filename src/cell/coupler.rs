@@ -1,7 +1,7 @@
 use crate::{Error, Result};
 use std::{sync::Arc, time::Duration};
 
-use parking_lot_rt::{Condvar, Mutex};
+use crate::locking::{Condvar, Mutex};
 
 struct CellValue<P, S> {
     primary: Option<P>,

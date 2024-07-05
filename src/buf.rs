@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use parking_lot_rt::Mutex;
+use crate::locking::Mutex;
 
 /// A capacity-limited thread-safe deque-based data buffer
 pub struct DataBuffer<T> {
