@@ -35,7 +35,7 @@ spin-waiting.
 For mission-critical applications, it is recommended to switch the crate to use
 an included priority-inheritance Mutex implementation (see [`pi::Mutex`]). The
 Mutex is available with no extra features, however IT IS NOT TURNED ON BY
-DEFAULT.
+DEFAULT FOR THE CRATE COMPONENTS.
 
 To turn on the priority-inheritance Mutex, disable the default features and
 enable `pi-locking`:
