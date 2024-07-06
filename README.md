@@ -27,8 +27,10 @@ various typical and custom use-cases.
 ## Locking
 
 By default, all components use Mutex/Condvar synchronization primitives from
-[parking_lot_rt](https://crates.io/crates/parking_lot_rt) This is a relatively
-safe real-time Mutex with minimal user-space spin-waiting.
+[parking_lot_rt](https://crates.io/crates/parking_lot_rt) - a real-time safe
+fork of the well-known [parking_lot](https://crates.io/crates/parking_lot)
+crate. This is a relatively safe real-time Mutex/RwLock with minimal user-space
+spin-waiting.
 
 For mission-critical applications, it is recommended to switch the crate to use
 an included priority-inheritance Mutex implementation (see [`pi::Mutex`]). The
@@ -47,6 +49,8 @@ Notes:
 * The priority-inheritance Mutex is slower than the default one.
 
 * The priority-inheritance Mutex is available for Linux only.
+
+* The module does not provide RwLock with priority inheritance.
 
 ## References
 
