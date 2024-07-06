@@ -13,18 +13,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-default:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: cargo test
-        run: cargo test --all-targets
-  test-pi-locking:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: cargo test
-        run: cargo test --all-targets --no-default-features --features pi-locking
+        run: cargo test --all-features --all-targets
   fmt:
     runs-on: ubuntu-latest
     steps:

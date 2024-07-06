@@ -1,6 +1,6 @@
 [package]
 name = "rtsc"
-version = "0.1.14"
+version = "0.2.0"
 edition = "2021"
 authors = ["Serhij S. <div@altertech.com>"]
 license = "Apache-2.0"
@@ -12,7 +12,7 @@ readme = "README.md"
 [dependencies]
 bma-ts = "0.1"
 object-id = "0.1"
-parking_lot_rt = { version = "0.12", optional = true }
+parking_lot_rt = "0.12"
 thiserror = "1.0"
 rtsc-derive = "0.1"
 pin-project = "1.1"
@@ -25,8 +25,4 @@ insta = "1.39"
 tokio = { version = "1.36", features = ["rt", "macros", "time"] }
 
 [features]
-#default = ["pi-locking"]
-default = ["default-locking"]
 serde = ["lock_api/serde"]
-default-locking = ["dep:parking_lot_rt"]
-pi-locking = []
