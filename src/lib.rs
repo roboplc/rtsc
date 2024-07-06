@@ -14,6 +14,9 @@ pub mod data_policy;
 pub mod pchannel;
 /// Policy-based async channel
 pub mod pchannel_async;
+/// Priority-inverting-safe locking (Linux only)
+#[cfg(target_os = "linux")]
+pub mod pi;
 /// Semaphore
 pub mod semaphore;
 /// Time tools
@@ -21,7 +24,10 @@ pub mod time;
 /// Timestamps
 pub use bma_ts;
 /// Locking primitives
+#[cfg(feature = "default-locking")]
 pub use parking_lot_rt as locking;
+#[cfg(feature = "pi-locking")]
+pub use pi as locking;
 /// Base channel type, allows to build sync channels with a custom storage
 pub mod base_channel;
 /// Base async channel type, allows to build async channels with a custom storage

@@ -12,6 +12,8 @@ techniques (see [Channels in Rust. Part
 2](https://medium.com/@disserman/channels-in-rust-part-2-603721567ee6) where
 such problems are clearly described).
 
+## Components
+
 This crate provides a pack of real-time-safe synchronization components for
 various typical and custom use-cases.
 
@@ -21,5 +23,31 @@ various typical and custom use-cases.
 * Policy-based channels
 * Semaphore
 * Time tools
+
+## Locking
+
+By default, all components use Mutex/Condvar synchronization primitives from
+[parking_lot_rt](https://crates.io/crates/parking_lot_rt) This is a relatively
+safe real-time Mutex with minimal user-space spin-waiting.
+
+For mission-critical applications, it is recommended to switch the crate to use
+an included priority-inheritance Mutex implementation (see [`pi::Mutex`]). The
+Mutex is available with no extra features, however IT IS NOT TURNED ON BY
+DEFAULT.
+
+To turn on the priority-inheritance Mutex, disable the default features and
+enable `pi-locking`:
+
+```
+cargo add rtsc --no-default-features --features pi-locking
+```
+
+Notes:
+
+* The priority-inheritance Mutex is slower than the default one.
+
+* The priority-inheritance Mutex is available for Linux only.
+
+## References
 
 RTSC is a part of [RoboPLC](https://www.roboplc.com) project.
