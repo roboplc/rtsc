@@ -16,7 +16,7 @@ fn tid() -> libc::pid_t {
     TID.with(|it| *it)
 }
 
-/// Result, returned by `Condvar::wait_timeout`.
+/// Result, returned by [`Condvar::wait_for`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WaitTimeoutResult {
     timed_out: bool,
