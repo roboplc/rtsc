@@ -26,7 +26,7 @@ various typical and custom use-cases.
 
 ## Locking
 
-On Linux the crate uses built-in priority-inheritance [`pi::Mutex]
+On Linux the crate uses built-in priority-inheritance [`pi::Mutex`]
 implementation and re-exports this module as `locking`.
 
 On other platforms, all components use Mutex/Condvar synchronization primitives
