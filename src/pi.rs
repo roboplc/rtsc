@@ -68,7 +68,10 @@ impl Condvar {
         mutex_guard: &mut MutexGuard<T>,
         timeout: Option<Duration>,
     ) -> WaitTimeoutResult {
-        self.waiters.fetch_add(1, Ordering::SeqCst);
+        assert!(
+            self.waiters.fetch_add(1, Ordering::SeqCst) < i32::MAX,
+            "CRITICAL: too many waiters"
+        );
         let mutex = unsafe { lock_api::MutexGuard::<'_, PiLock, T>::mutex(mutex_guard).raw() };
         if mutex.is_locked() {
             mutex.perform_unlock();
