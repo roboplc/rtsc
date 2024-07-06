@@ -121,7 +121,7 @@ impl Condvar {
     }
 }
 
-/// Raw mutex implementation for the priority-inheritance based mutex.
+/// The lock implementation for the priority-inheritance based mutex.
 #[allow(clippy::module_name_repetitions)]
 pub struct PiLock {
     futex: PiFutex<Private>,
