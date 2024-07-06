@@ -40,7 +40,7 @@ DEFAULT FOR THE CRATE COMPONENTS.
 To turn on the priority-inheritance Mutex, disable the default features and
 enable `pi-locking`:
 
-```
+```shell
 cargo add rtsc --no-default-features --features pi-locking
 ```
 

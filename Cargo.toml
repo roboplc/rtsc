@@ -1,6 +1,6 @@
 [package]
 name = "rtsc"
-version = "0.1.13"
+version = "0.1.14"
 edition = "2021"
 authors = ["Serhij S. <div@altertech.com>"]
 license = "Apache-2.0"
@@ -25,7 +25,8 @@ insta = "1.39"
 tokio = { version = "1.36", features = ["rt", "macros", "time"] }
 
 [features]
-default = ["pi-locking"]
-#default = ["default-locking"]
+#default = ["pi-locking"]
+default = ["default-locking"]
+serde = ["lock_api/serde"]
 default-locking = ["dep:parking_lot_rt"]
 pi-locking = []

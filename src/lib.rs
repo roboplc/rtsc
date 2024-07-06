@@ -25,9 +25,9 @@ pub mod time;
 pub use bma_ts;
 /// Locking primitives
 #[cfg(feature = "default-locking")]
-pub use parking_lot_rt as locking;
+use parking_lot_rt as locking;
 #[cfg(feature = "pi-locking")]
-pub use pi as locking;
+use pi as locking;
 /// Base channel type, allows to build sync channels with a custom storage
 pub mod base_channel;
 /// Base async channel type, allows to build async channels with a custom storage
