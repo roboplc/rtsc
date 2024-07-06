@@ -17,12 +17,10 @@ pub mod pchannel_async;
 /// Priority-inverting-safe locking (Linux only)
 #[cfg(target_os = "linux")]
 pub mod pi;
-#[cfg(target_os = "linux")]
-pub use pi as locking;
-#[cfg(not(target_os = "linux"))]
-pub mod pi;
 #[cfg(not(target_os = "linux"))]
 pub use parking_lot_rt as locking;
+#[cfg(target_os = "linux")]
+pub use pi as locking;
 /// Semaphore
 pub mod semaphore;
 /// Time tools

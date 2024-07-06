@@ -12,7 +12,6 @@ readme = "README.md"
 [dependencies]
 bma-ts = "0.1"
 object-id = "0.1"
-parking_lot_rt = "0.12"
 thiserror = "1.0"
 rtsc-derive = "0.1"
 pin-project = "1.1"
@@ -21,6 +20,9 @@ pin-project = "1.1"
 lock_api = "0.4.12"
 libc = "0.2.155"
 linux-futex = "1.0.0"
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+parking_lot_rt = "0.12"
 
 [dev-dependencies]
 insta = "1.39"
