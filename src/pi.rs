@@ -37,8 +37,8 @@ pub struct Condvar {
 }
 
 impl Condvar {
-    /// Creates a new `Condvar`. Unlike traditional approach, a single Condvar can be used with any
-    /// number of mutexes.
+    /// Creates a new [`Condvar`]. Unlike traditional approach, a single Condvar can be used with
+    /// any number of mutexes.
     pub const fn new() -> Self {
         Self {
             waiters: AtomicI32::new(0),
