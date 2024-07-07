@@ -8,7 +8,8 @@ use linux_futex::{AsFutex as _, Futex, PiFutex, Private, TimedWaitError};
 use lock_api::{GuardSend, RawMutex, RawMutexTimed};
 
 thread_local! {
-    static TID: libc::pid_t = unsafe { libc::gettid() };
+    #[allow(clippy::cast_possible_truncation)]
+    static TID: libc::pid_t = unsafe { libc::syscall(libc::SYS_gettid) as i32 }
 }
 
 #[inline]
