@@ -20,7 +20,7 @@ use pin_project::{pin_project, pinned_drop};
 type ClientId = usize;
 
 /// Base async channel
-pub struct BaseChannelAsync<T: Sized, S: ChannelStorage<T>>(Arc<ChannelInner<T, S>>);
+pub struct BaseChannelAsync<T: Sized, S: ChannelStorage<T>>(pub(crate) Arc<ChannelInner<T, S>>);
 
 impl<T: Sized, S: ChannelStorage<T>> BaseChannelAsync<T, S> {
     fn id(&self) -> usize {
@@ -46,9 +46,9 @@ where
     }
 }
 
-struct ChannelInner<T: Sized, S: ChannelStorage<T>> {
+pub(crate) struct ChannelInner<T: Sized, S: ChannelStorage<T>> {
     id: UniqueId,
-    data: Mutex<InnerData<T, S>>,
+    pub(crate) data: Mutex<InnerData<T, S>>,
     next_op_id: AtomicUsize,
     space_available: Arc<Condvar>,
     data_available: Arc<Condvar>,
@@ -75,14 +75,16 @@ impl<T: Sized, S: ChannelStorage<T>> BaseChannelAsync<T, S> {
     }
 }
 
-struct InnerData<T: Sized, S: ChannelStorage<T>> {
+pub(crate) struct InnerData<T: Sized, S: ChannelStorage<T>> {
     queue: S,
     senders: usize,
     receivers: usize,
-    send_fut_wakers: VecDeque<Option<(Waker, ClientId)>>,
-    send_fut_pending: BTreeSet<ClientId>,
-    recv_fut_wakers: VecDeque<Option<(Waker, ClientId)>>,
-    recv_fut_pending: BTreeSet<ClientId>,
+    pub(crate) send_fut_wakers: VecDeque<Option<(Waker, ClientId)>>,
+    pub(crate) send_fut_waker_ids: BTreeSet<ClientId>,
+    pub(crate) send_fut_pending: BTreeSet<ClientId>,
+    pub(crate) recv_fut_wakers: VecDeque<Option<(Waker, ClientId)>>,
+    pub(crate) recv_fut_waker_ids: BTreeSet<ClientId>,
+    pub(crate) recv_fut_pending: BTreeSet<ClientId>,
     data_available: Arc<Condvar>,
     space_available: Arc<Condvar>,
     _phatom: PhantomData<T>,
@@ -100,8 +102,10 @@ where
             senders: 1,
             receivers: 1,
             send_fut_wakers: <_>::default(),
+            send_fut_waker_ids: <_>::default(),
             send_fut_pending: <_>::default(),
             recv_fut_wakers: <_>::default(),
+            recv_fut_waker_ids: <_>::default(),
             recv_fut_pending: <_>::default(),
             data_available: <_>::default(),
             space_available: <_>::default(),
@@ -120,6 +124,7 @@ where
     fn wake_next_send(&mut self) {
         if let Some(w) = self.send_fut_wakers.pop_front() {
             if let Some((waker, id)) = w {
+                self.send_fut_waker_ids.remove(&id);
                 self.send_fut_pending.insert(id);
                 waker.wake();
             } else {
@@ -129,6 +134,7 @@ where
     }
     #[inline]
     fn wake_all_sends(&mut self) {
+        self.send_fut_waker_ids.clear();
         for (waker, _) in mem::take(&mut self.send_fut_wakers).into_iter().flatten() {
             waker.wake();
         }
@@ -143,6 +149,7 @@ where
             .position(|w| w.as_ref().map_or(false, |(_, i)| *i == id))
         {
             self.send_fut_wakers.remove(pos);
+            self.send_fut_waker_ids.remove(&id);
         }
         if self.send_fut_pending.remove(&id) {
             self.wake_next_send();
@@ -156,6 +163,9 @@ where
 
     #[inline]
     fn append_send_fut_waker(&mut self, waker: Waker, id: ClientId) {
+        if !self.send_fut_waker_ids.insert(id) {
+            return;
+        }
         self.send_fut_wakers.push_back(Some((waker, id)));
     }
 
@@ -177,6 +187,7 @@ where
         if let Some(w) = self.recv_fut_wakers.pop_front() {
             if let Some((waker, id)) = w {
                 self.recv_fut_pending.insert(id);
+                self.recv_fut_waker_ids.remove(&id);
                 waker.wake();
             } else {
                 self.data_available.notify_one();
@@ -188,6 +199,7 @@ where
         for (waker, _) in mem::take(&mut self.recv_fut_wakers).into_iter().flatten() {
             waker.wake();
         }
+        self.recv_fut_waker_ids.clear();
         self.data_available.notify_all();
     }
 
@@ -199,6 +211,7 @@ where
             .position(|w| w.as_ref().map_or(false, |(_, i)| *i == id))
         {
             self.recv_fut_wakers.remove(pos);
+            self.recv_fut_waker_ids.remove(&id);
         }
         if self.recv_fut_pending.remove(&id) {
             self.wake_next_recv();
@@ -213,6 +226,9 @@ where
 
     #[inline]
     fn append_recv_fut_waker(&mut self, waker: Waker, id: ClientId) {
+        if !self.recv_fut_waker_ids.insert(id) {
+            return;
+        }
         self.recv_fut_wakers.push_back(Some((waker, id)));
     }
 
@@ -262,9 +278,11 @@ where
                 self.value = Some(val);
             } else {
                 self.queued = false;
-                pc.notify_data_sent();
                 return Poll::Ready(match push_result {
-                    StorageTryPushOutput::Pushed => Ok(()),
+                    StorageTryPushOutput::Pushed => {
+                        pc.notify_data_sent();
+                        Ok(())
+                    }
                     StorageTryPushOutput::Skipped => Err(Error::ChannelSkipped),
                     StorageTryPushOutput::Full(_) => unreachable!(),
                 });
@@ -331,9 +349,11 @@ where
             pc.append_send_sync_waker();
             self.channel.0.space_available.wait(&mut pc);
         };
-        pc.wake_next_recv();
         match pushed {
-            StorageTryPushOutput::Pushed => Ok(()),
+            StorageTryPushOutput::Pushed => {
+                pc.notify_data_sent();
+                Ok(())
+            }
             StorageTryPushOutput::Skipped => Err(Error::ChannelSkipped),
             StorageTryPushOutput::Full(_) => unreachable!(),
         }
@@ -361,7 +381,7 @@ where
                 return Err(Error::Timeout);
             }
         };
-        pc.wake_next_recv();
+        pc.notify_data_sent();
         match pushed {
             StorageTryPushOutput::Pushed => Ok(()),
             StorageTryPushOutput::Skipped => Err(Error::ChannelSkipped),
@@ -465,7 +485,7 @@ where
     T: Sized,
     S: ChannelStorage<T>,
 {
-    channel: BaseChannelAsync<T, S>,
+    pub(crate) channel: BaseChannelAsync<T, S>,
 }
 
 impl<T, S> BaseReceiverAsync<T, S>
@@ -499,7 +519,7 @@ where
         let mut pc = self.channel.0.data.lock();
         loop {
             if let Some(val) = pc.queue.get() {
-                pc.wake_next_send();
+                pc.notify_data_received();
                 return Ok(val);
             } else if pc.senders == 0 {
                 return Err(Error::ChannelClosed);
@@ -513,7 +533,7 @@ where
         let mut pc = self.channel.0.data.lock();
         loop {
             if let Some(val) = pc.queue.get() {
-                pc.wake_next_send();
+                pc.notify_data_received();
                 return Ok(val);
             } else if pc.senders == 0 {
                 return Err(Error::ChannelClosed);

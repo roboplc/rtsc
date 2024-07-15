@@ -42,6 +42,13 @@ mod test {
             messages.push(msg);
         }
         insta::assert_debug_snapshot!(messages.len(), @"20");
+        let data = rx.channel.0.data.lock();
+        assert!(data.send_fut_wakers.is_empty());
+        assert!(data.send_fut_waker_ids.is_empty());
+        assert!(data.send_fut_pending.is_empty());
+        assert!(data.recv_fut_wakers.is_empty());
+        assert!(data.recv_fut_waker_ids.is_empty());
+        assert!(data.recv_fut_pending.is_empty());
     }
 
     #[tokio::test]
