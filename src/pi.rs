@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use linux_futex::{AsFutex as _, Futex, PiFutex, Private, TimedWaitError};
+use linux_futex::{AsFutex as _, Futex, PiFutex, Private, TimedWaitError, WaitError};
 use lock_api::{GuardSend, RawMutex, RawMutexTimed};
 
 thread_local! {
@@ -92,8 +92,13 @@ impl Condvar {
                 }
             }
         } else {
-            fx.wait(0).unwrap();
-            WaitTimeoutResult { timed_out: false }
+            loop {
+                match fx.wait(0) {
+                    Ok(()) => break WaitTimeoutResult { timed_out: false },
+                    Err(WaitError::Interrupted) => continue,
+                    Err(WaitError::WrongValue) => unreachable!(),
+                }
+            }
         };
         self.waiters.fetch_sub(1, Ordering::SeqCst);
         mutex.perform_lock();
