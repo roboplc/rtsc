@@ -410,7 +410,42 @@ mod tests {
     }
 
     #[test]
-    fn test_condvar_timeout_wait_loop() {
+    fn test_condvar_timeout_wait_loop_notify_one() {
+        for _ in 0..ITERS {
+            let pair = Arc::new((Mutex::new(false), Condvar::new()));
+            let mut handles = vec![];
+
+            for _ in 0..NUM_THREADS {
+                let pair_clone = Arc::clone(&pair);
+                handles.push(thread::spawn(move || {
+                    let (lock, cvar) = &*pair_clone;
+                    let mut mx = lock.lock();
+                    if cvar
+                        .wait_for(&mut mx, Duration::from_millis(100))
+                        .timed_out()
+                    {
+                        panic!("timed out");
+                    }
+                }));
+            }
+
+            thread::sleep(Duration::from_millis(50));
+            {
+                let (lock, cvar) = &*pair;
+                for _ in 0..NUM_THREADS {
+                    let mut started = lock.lock();
+                    *started = true;
+                    cvar.notify_one();
+                }
+            }
+
+            for handle in handles {
+                handle.join().unwrap();
+            }
+        }
+    }
+    #[test]
+    fn test_condvar_timeout_wait_loop_notify_all() {
         for _ in 0..ITERS {
             let pair = Arc::new((Mutex::new(false), Condvar::new()));
             let mut handles = vec![];
