@@ -69,13 +69,17 @@ impl Condvar {
         mutex_guard: &mut MutexGuard<T>,
         timeout: Option<Duration>,
     ) -> WaitTimeoutResult {
-        assert!(
-            self.waiters.fetch_add(1, Ordering::SeqCst) < i32::MAX,
-            "CRITICAL: too many waiters"
-        );
         let mutex = unsafe { lock_api::MutexGuard::<'_, PiLock, T>::mutex(mutex_guard).raw() };
-        if mutex.is_locked() {
-            mutex.perform_unlock();
+        macro_rules! unlock {
+            () => {
+                assert!(
+                    self.waiters.fetch_add(1, Ordering::SeqCst) < i32::MAX,
+                    "CRITICAL: too many waiters"
+                );
+                if mutex.is_locked() {
+                    mutex.perform_unlock();
+                }
+            };
         }
         let fx: &Futex<Private> = self.fx.as_futex();
         let result = if let Some(timeout) = timeout {
@@ -84,6 +88,7 @@ impl Condvar {
                 let Some(remaining) = timeout.checked_sub(now.elapsed()) else {
                     break WaitTimeoutResult { timed_out: true };
                 };
+                unlock!();
                 match fx.wait_for(0, remaining) {
                     Ok(()) => break WaitTimeoutResult { timed_out: false },
                     Err(TimedWaitError::TimedOut) => break WaitTimeoutResult { timed_out: true },
@@ -93,6 +98,7 @@ impl Condvar {
             }
         } else {
             loop {
+                unlock!();
                 match fx.wait(0) {
                     Ok(()) => break WaitTimeoutResult { timed_out: false },
                     Err(WaitError::Interrupted) => continue,
@@ -108,16 +114,18 @@ impl Condvar {
     /// Notifies one thread waiting on this condvar.
     pub fn notify_one(&self) {
         let fx: &Futex<Private> = self.fx.as_futex();
+        let mut backoff = Backoff::new();
         while self.waiters.load(Ordering::SeqCst) > 0 && fx.wake(1) == 0 {
             // there is a chance that some waiter has not been entered into the futex yet, waiting
             // for it in a tiny spin loop
-            thread::yield_now();
+            backoff.backoff();
         }
     }
 
     /// Notifies all threads waiting on this condvar.
     pub fn notify_all(&self) {
         let fx: &Futex<Private> = self.fx.as_futex();
+        let mut backoff = Backoff::new();
         loop {
             let to_wake = self.waiters.load(Ordering::SeqCst);
             if to_wake == 0 || fx.wake(to_wake) == to_wake {
@@ -125,7 +133,42 @@ impl Condvar {
             }
             // there is a chance that some waiter has not been entered into the futex yet, waiting
             // for it in a tiny spin loop
-            thread::yield_now();
+            backoff.backoff();
+        }
+    }
+}
+
+// Backoff strategy for the conditional variable.
+//
+// If the notify thread is running with higher priority, the waiter might be blocked
+// between mutex.unlock() and futex.wait(). So, we need to backoff in notify_one() and
+// notify_all().
+//
+// It is proven by tests that yelding is not enough, as futex.wake() is a relatively expensive
+// operation so it should be called as less as possible (ideal case is <=2).
+//
+// The initial 50us quant has been chosen as a trade-off between performance and fairness. It is
+// proven to be enough to let a waiter with sched=1 to enter the futex from the first time even if
+// the notify thread is spinning with sched=99 (in case if both are on the same CPU).
+//
+// Tested on: ARM Cortex-A53, ARM Cortex-A72
+//
+// The backoff time is increased by 50us each time, to make sure the loop does not block
+// the waiter on different (possibly slower) CPU models.
+struct Backoff {
+    n: u32,
+}
+
+impl Backoff {
+    fn new() -> Self {
+        Self { n: 50 }
+    }
+
+    fn backoff(&mut self) {
+        thread::sleep(Duration::from_micros(self.n.into()));
+        if self.n < 200 {
+            // max sleep time = 200us
+            self.n += 25;
         }
     }
 }
@@ -177,6 +220,7 @@ impl PiLock {
             self.futex.unlock_pi();
         }
     }
+    #[inline]
     fn is_locked(&self) -> bool {
         self.futex.value.load(Ordering::SeqCst) != 0
     }
