@@ -336,7 +336,7 @@ mod tests {
                         *num += 1;
                     }
                 }));
-                thread::sleep(Duration::from_micros(100));
+                thread::sleep(Duration::from_micros(200));
             }
 
             for handle in handles {
