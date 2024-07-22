@@ -84,6 +84,45 @@ mod test {
     }
 
     #[test]
+    fn test_tx_ordering() {
+        let (tx, rx) = bounded(1);
+        tx.send(0).unwrap();
+        for i in 1..=10 {
+            let tx = tx.clone();
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(10 * i));
+                tx.send(i).unwrap();
+            });
+        }
+        thread::sleep(Duration::from_millis(500));
+        for i in 0..=10 {
+            assert_eq!(rx.recv().unwrap(), i);
+        }
+    }
+
+    #[test]
+    fn test_rx_ordering() {
+        let (tx, rx) = bounded(1);
+        let (res_tx, res_rx) = bounded(1024);
+        for i in 0..10 {
+            let rx = rx.clone();
+            let res_tx = res_tx.clone();
+            thread::spawn(move || {
+                thread::sleep(Duration::from_millis(10 * i));
+                let val = rx.recv().unwrap();
+                res_tx.send(val).unwrap();
+            });
+        }
+        for i in 0..10 {
+            tx.send(i).unwrap();
+        }
+        thread::sleep(Duration::from_millis(500));
+        for i in 0..10 {
+            assert_eq!(res_rx.recv().unwrap(), i);
+        }
+    }
+
+    #[test]
     fn test_poisoning() {
         let n = 5_000;
         for i in 0..n {

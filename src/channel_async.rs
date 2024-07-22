@@ -52,6 +52,45 @@ mod test {
     }
 
     #[tokio::test]
+    async fn test_tx_ordering() {
+        let (tx, rx) = bounded(1);
+        tx.send(0).await.unwrap();
+        for i in 1..=10 {
+            let tx = tx.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(10 * i)).await;
+                tx.send(i).await.unwrap();
+            });
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        for i in 0..=10 {
+            assert_eq!(rx.recv().await.unwrap(), i);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_rx_ordering() {
+        let (tx, rx) = bounded(1);
+        let (res_tx, res_rx) = bounded(1024);
+        for i in 0..10 {
+            let rx = rx.clone();
+            let res_tx = res_tx.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(10 * i)).await;
+                let val = rx.recv().await.unwrap();
+                res_tx.send(val).await.unwrap();
+            });
+        }
+        for i in 0..10 {
+            tx.send(i).await.unwrap();
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        for i in 0..10 {
+            assert_eq!(res_rx.recv().await.unwrap(), i);
+        }
+    }
+
+    #[tokio::test]
     async fn test_poisoning() {
         let n = 5_000;
         for i in 0..n {
