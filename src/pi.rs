@@ -153,7 +153,7 @@ impl Condvar {
 //
 // Tested on: ARM Cortex-A53, ARM Cortex-A72
 //
-// The backoff time is increased by 50us each time, to make sure the loop does not block
+// The backoff time is increased by 25us each time, to make sure the loop does not block
 // the waiter on different (possibly slower) CPU models.
 //
 // Note that conditional variables might still face priority inversion problem for certain cases
