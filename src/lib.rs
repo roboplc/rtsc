@@ -10,13 +10,13 @@ pub mod channel;
 pub mod channel_async;
 /// Data policies
 pub mod data_policy;
-/// Policy-based sync channel
-pub mod pchannel;
-/// Policy-based async channel
-pub mod pchannel_async;
 /// Priority-inverting-safe locking (Linux only)
 #[cfg(target_os = "linux")]
 pub mod pi;
+/// Policy-based sync channel
+pub mod policy_channel;
+/// Policy-based async channel
+pub mod policy_channel_async;
 #[cfg(not(target_os = "linux"))]
 pub use parking_lot_rt as locking;
 #[cfg(target_os = "linux")]
@@ -31,6 +31,8 @@ pub use bma_ts;
 pub mod base_channel;
 /// Base async channel type, allows to build async channels with a custom storage
 pub mod base_channel_async;
+/// Conditional traits
+pub mod condvar_api;
 /// Time-limited operations
 pub mod ops;
 /// Policy-based deque

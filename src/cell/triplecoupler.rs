@@ -1,7 +1,12 @@
-use crate::{Error, Result};
 use std::{sync::Arc, time::Duration};
 
-use crate::locking::{Condvar, Mutex};
+use crate::{
+    condvar_api::RawCondvar,
+    locking::{Condvar, RawMutex},
+    Error, Result,
+};
+
+use lock_api::RawMutex as RawMutexTrait;
 
 struct CellValue<P, S, T> {
     primary: Option<P>,
@@ -10,18 +15,33 @@ struct CellValue<P, S, T> {
     closed: bool,
 }
 
-struct TripleCouplerInner<P, S, T> {
-    value: Mutex<CellValue<P, S, T>>,
-    data_available: Condvar,
+impl<P, S, T> Default for CellValue<P, S, T> {
+    fn default() -> Self {
+        Self {
+            primary: None,
+            second: None,
+            third: None,
+            closed: false,
+        }
+    }
+}
+
+struct TripleCouplerInner<P, S, T, M, CV> {
+    value: lock_api::Mutex<M, CellValue<P, S, T>>,
+    data_available: CV,
 }
 
 /// Data coupler, which combines [`crate::cell::DataCell`] functionality with two additional data
 /// value. The primary value is combined with the secondary, the secondary may not be present.
-pub struct TripleCoupler<P, S, T> {
-    inner: Arc<TripleCouplerInner<P, S, T>>,
+pub struct TripleCoupler<P, S, T, M = RawMutex, CV = Condvar> {
+    inner: Arc<TripleCouplerInner<P, S, T, M, CV>>,
 }
 
-impl<P, S, T> Clone for TripleCoupler<P, S, T> {
+impl<P, S, T, M, CV> Clone for TripleCoupler<P, S, T, M, CV>
+where
+    M: RawMutexTrait,
+    CV: RawCondvar,
+{
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -29,23 +49,26 @@ impl<P, S, T> Clone for TripleCoupler<P, S, T> {
     }
 }
 
-impl<P, S, T> Default for TripleCoupler<P, S, T> {
+impl<P, S, T, M, CV> Default for TripleCoupler<P, S, T, M, CV>
+where
+    M: RawMutexTrait,
+    CV: RawCondvar,
+{
     fn default() -> Self {
         Self {
             inner: Arc::new(TripleCouplerInner {
-                value: Mutex::new(CellValue {
-                    primary: None,
-                    second: None,
-                    third: None,
-                    closed: false,
-                }),
-                data_available: Condvar::new(),
+                value: <_>::default(),
+                data_available: CV::new(),
             }),
         }
     }
 }
 
-impl<P, S, T> TripleCoupler<P, S, T> {
+impl<P, S, T, M, CV> TripleCoupler<P, S, T, M, CV>
+where
+    M: RawMutexTrait,
+    CV: RawCondvar + RawCondvar<RawMutex = M>,
+{
     /// Creates a new triple coupler
     pub fn new() -> Self {
         Self::default()
@@ -104,7 +127,9 @@ impl<P, S, T> TripleCoupler<P, S, T> {
             if let Some(primary) = value.primary.take() {
                 return Ok((primary, value.second.take(), value.third.take()));
             }
-            self.inner.data_available.wait(&mut value);
+            self.inner
+                .data_available
+                .wait::<CellValue<P, S, T>, M>(&mut value);
         }
     }
     /// Retrieves the primary and secondary values from the cell with the given timeout
@@ -120,7 +145,7 @@ impl<P, S, T> TripleCoupler<P, S, T> {
             if self
                 .inner
                 .data_available
-                .wait_for(&mut value, timeout)
+                .wait_for::<CellValue<P, S, T>, M>(&mut value, timeout)
                 .timed_out()
             {
                 return Err(Error::Timeout);
@@ -155,7 +180,7 @@ mod test {
 
     #[test]
     fn test_coupler() {
-        let cell = TripleCoupler::new();
+        let cell: TripleCoupler<_, _, _> = TripleCoupler::new();
         let cell2 = cell.clone();
         let handle = thread::spawn(move || {
             thread::sleep(Duration::from_millis(100));
@@ -181,7 +206,7 @@ mod test {
 
     #[test]
     fn test_coupler_try_get() {
-        let cell = TripleCoupler::new();
+        let cell: TripleCoupler<_, _, _> = TripleCoupler::new();
         assert_eq!(cell.try_get().unwrap_err(), Error::ChannelEmpty);
         let cell2 = cell.clone();
         let handle = thread::spawn(move || {
@@ -191,5 +216,20 @@ mod test {
         });
         handle.join().unwrap();
         assert_eq!(cell.try_get().unwrap(), (42, Some(33), Some(45)));
+    }
+
+    #[test]
+    fn test_coupler_other_mutex() {
+        let cell: TripleCoupler<_, _, _, parking_lot_rt::RawMutex, parking_lot_rt::Condvar> =
+            TripleCoupler::new();
+        let cell2 = cell.clone();
+        let handle = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(100));
+            cell2.set_second(33);
+            cell2.set_third(45);
+            cell2.set(42);
+        });
+        assert_eq!(cell.get().unwrap(), (42, Some(33), Some(45)));
+        handle.join().unwrap();
     }
 }

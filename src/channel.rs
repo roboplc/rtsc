@@ -2,7 +2,9 @@ use std::collections::VecDeque;
 
 use crate::{
     base_channel::{make_channel, BaseChannel, BaseReceiver, BaseSender, ChannelStorage},
+    condvar_api::RawCondvar,
     data_policy::StorageTryPushOutput,
+    locking::{Condvar, RawMutex},
 };
 
 impl<T> ChannelStorage<T> for VecDeque<T>
@@ -44,30 +46,69 @@ where
 }
 
 /// Channel sender
-pub type Sender<T> = BaseSender<T, VecDeque<T>>;
+pub type Sender<T, M, CV> = BaseSender<T, VecDeque<T>, M, CV>;
 
 /// Channel receiver
-pub type Receiver<T> = BaseReceiver<T, VecDeque<T>>;
+pub type Receiver<T, M, CV> = BaseReceiver<T, VecDeque<T>, M, CV>;
 
-/// Create a new bounded channel
+/// Bounded channel structure. Used to be destructurized into a sender and a receiver. A workaround
+/// to let the user use the default Mutex and Condvar types if others are not required
 ///
 /// # Panics
 ///
 /// Will panic if the capacity is zero
-pub fn bounded<T>(capacity: usize) -> (Sender<T>, Receiver<T>) {
-    let ch = BaseChannel::new(capacity, false);
-    make_channel(ch)
+pub struct Bounded<T, M = RawMutex, CV = Condvar>
+where
+    M: lock_api::RawMutex,
+    CV: RawCondvar,
+{
+    /// Channel sender
+    pub tx: Sender<T, M, CV>,
+    /// Channel receiver
+    pub rx: Receiver<T, M, CV>,
+}
+
+impl<T, M, CV> Bounded<T, M, CV>
+where
+    M: lock_api::RawMutex,
+    CV: RawCondvar,
+{
+    /// Create a new bounded channel
+    pub fn new(capacity: usize) -> Self {
+        let ch = BaseChannel::new(capacity, false);
+        let (tx, rx) = make_channel(ch);
+        Self { tx, rx }
+    }
+}
+
+/// Create a bounded channel and return it as a tuple of a sender and a receiver
+pub fn bounded<T, M, CV>(capacity: usize) -> (Sender<T, M, CV>, Receiver<T, M, CV>)
+where
+    M: lock_api::RawMutex,
+    CV: RawCondvar,
+{
+    let Bounded { tx, rx } = Bounded::new(capacity);
+    (tx, rx)
+}
+
+/// Create a new bounded channel and automatically destructurize it into a sender and a receiver
+#[allow(clippy::module_name_repetitions)]
+#[macro_export]
+macro_rules! channel_bounded {
+    ($capacity: expr) => {{
+        let $crate::channel::Bounded { tx, rx } = $crate::channel::Bounded::<_>::new($capacity);
+        (tx, rx)
+    }};
 }
 
 #[cfg(test)]
 mod test {
+    use crate::channel_bounded;
     use std::{thread, time::Duration};
-
-    use super::bounded;
 
     #[test]
     fn test_delivery() {
-        let (tx, rx) = bounded::<u32>(1);
+        let (tx, rx) = channel_bounded!(1);
         thread::spawn(move || {
             for _ in 0..10 {
                 tx.send(123).unwrap();
@@ -85,7 +126,7 @@ mod test {
 
     #[test]
     fn test_tx_ordering() {
-        let (tx, rx) = bounded(1);
+        let (tx, rx) = channel_bounded!(1);
         tx.send(0).unwrap();
         for i in 1..=10 {
             let tx = tx.clone();
@@ -102,8 +143,8 @@ mod test {
 
     #[test]
     fn test_rx_ordering() {
-        let (tx, rx) = bounded(1);
-        let (res_tx, res_rx) = bounded(1024);
+        let (tx, rx) = channel_bounded!(1);
+        let (res_tx, res_rx) = channel_bounded!(1024);
         for i in 0..10 {
             let rx = rx.clone();
             let res_tx = res_tx.clone();
@@ -126,7 +167,7 @@ mod test {
     fn test_poisoning() {
         let n = 5_000;
         for i in 0..n {
-            let (tx, rx) = bounded::<u32>(512);
+            let super::Bounded { tx, rx }: super::Bounded<i32> = super::Bounded::new(512);
             let rx_t = thread::spawn(move || while rx.recv().is_ok() {});
             thread::spawn(move || {
                 let _t = tx;
@@ -139,5 +180,14 @@ mod test {
             }
             assert!(rx_t.is_finished(), "RX poisined {}", i);
         }
+    }
+
+    #[test]
+    fn test_other_mutex() {
+        let (tx, rx) = super::bounded::<i32, parking_lot_rt::RawMutex, parking_lot_rt::Condvar>(1);
+        tx.send(42).unwrap();
+        assert_eq!(rx.recv().unwrap(), 42);
+        assert!(tx.is_empty());
+        assert!(rx.is_empty());
     }
 }

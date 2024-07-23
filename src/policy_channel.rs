@@ -1,6 +1,8 @@
 use crate::{
     base_channel::{make_channel, BaseChannel, BaseReceiver, BaseSender, ChannelStorage},
+    condvar_api::RawCondvar,
     data_policy::{DataDeliveryPolicy, StorageTryPushOutput},
+    locking::{Condvar, RawMutex},
     pdeque,
 };
 
@@ -37,10 +39,75 @@ where
 }
 
 /// Channel sender
-pub type Sender<T> = BaseSender<T, pdeque::Deque<T>>;
+pub type Sender<T, M, CV> = BaseSender<T, pdeque::Deque<T>, M, CV>;
 
 /// Channel receiver
-pub type Receiver<T> = BaseReceiver<T, pdeque::Deque<T>>;
+pub type Receiver<T, M, CV> = BaseReceiver<T, pdeque::Deque<T>, M, CV>;
+
+/// Bounded policy channel structure. Used to be destructurized into a sender and a receiver. A
+/// workaround to let the user use the default Mutex and Condvar types if others are not required
+///
+/// # Panics
+///
+/// Will panic if the capacity is zero
+pub struct Bounded<T, M = RawMutex, CV = Condvar>
+where
+    T: DataDeliveryPolicy,
+    M: lock_api::RawMutex,
+    CV: RawCondvar,
+{
+    /// Channel sender
+    pub tx: Sender<T, M, CV>,
+    /// Channel receiver
+    pub rx: Receiver<T, M, CV>,
+}
+
+impl<T, M, CV> Bounded<T, M, CV>
+where
+    T: DataDeliveryPolicy,
+    M: lock_api::RawMutex,
+    CV: RawCondvar,
+{
+    /// Create a new bounded channel
+    pub fn new(capacity: usize) -> Self {
+        let ch = BaseChannel::new(capacity, false);
+        let (tx, rx) = make_channel(ch);
+        Self { tx, rx }
+    }
+}
+
+/// Bounded and ordered policy channel structure. Used to be destructurized into a sender and a
+/// receiver. A workaround to let the user use the default Mutex and Condvar types if others are
+/// not required
+///
+/// # Panics
+///
+/// Will panic if the capacity is zero
+pub struct Ordered<T, M = RawMutex, CV = Condvar>
+where
+    T: DataDeliveryPolicy,
+    M: lock_api::RawMutex,
+    CV: RawCondvar,
+{
+    /// Channel sender
+    pub tx: Sender<T, M, CV>,
+    /// Channel receiver
+    pub rx: Receiver<T, M, CV>,
+}
+
+impl<T, M, CV> Ordered<T, M, CV>
+where
+    T: DataDeliveryPolicy,
+    M: lock_api::RawMutex,
+    CV: RawCondvar,
+{
+    /// Create a new bounded channel
+    pub fn new(capacity: usize) -> Self {
+        let ch = BaseChannel::new(capacity, true);
+        let (tx, rx) = make_channel(ch);
+        Self { tx, rx }
+    }
+}
 
 /// Creates a bounded sync channel which respects [`DataDeliveryPolicy`] rules with no message
 /// priority ordering
@@ -48,12 +115,14 @@ pub type Receiver<T> = BaseReceiver<T, pdeque::Deque<T>>;
 /// # Panics
 ///
 /// Will panic if the capacity is zero
-pub fn bounded<T>(capacity: usize) -> (Sender<T>, Receiver<T>)
+pub fn bounded<T, M, CV>(capacity: usize) -> (Sender<T, M, CV>, Receiver<T, M, CV>)
 where
     T: DataDeliveryPolicy,
+    M: lock_api::RawMutex,
+    CV: RawCondvar,
 {
-    let ch = BaseChannel::new(capacity, false);
-    make_channel(ch)
+    let Bounded { tx, rx } = Bounded::new(capacity);
+    (tx, rx)
 }
 
 /// Creates a bounded channel which respects [`DataDeliveryPolicy`] rules and has got message
@@ -62,12 +131,38 @@ where
 /// # Panics
 ///
 /// Will panic if the capacity is zero
-pub fn ordered<T>(capacity: usize) -> (Sender<T>, Receiver<T>)
+pub fn ordered<T, M, CV>(capacity: usize) -> (Sender<T, M, CV>, Receiver<T, M, CV>)
 where
     T: DataDeliveryPolicy,
+    M: lock_api::RawMutex,
+    CV: RawCondvar,
 {
-    let ch = BaseChannel::new(capacity, true);
-    make_channel(ch)
+    let Ordered { tx, rx } = Ordered::new(capacity);
+    (tx, rx)
+}
+
+/// Create a new bounded policy channel and automatically destructurize it into a sender and a
+/// receiver
+#[allow(clippy::module_name_repetitions)]
+#[macro_export]
+macro_rules! policy_channel_bounded {
+    ($capacity: expr) => {{
+        let $crate::policy_channel::Bounded { tx, rx } =
+            $crate::policy_channel::Bounded::<_>::new($capacity);
+        (tx, rx)
+    }};
+}
+
+/// Create a new bounded and ordered policy channel and automatically destructurize it into a
+/// sender and a receiver
+#[allow(clippy::module_name_repetitions)]
+#[macro_export]
+macro_rules! policy_channel_bounded_ordered {
+    ($capacity: expr) => {{
+        let $crate::policy_channel::Ordered { tx, rx } =
+            $crate::policy_channel::Ordered::<_>::new($capacity);
+        (tx, rx)
+    }};
 }
 
 #[cfg(test)]
@@ -79,7 +174,7 @@ mod test {
         Error,
     };
 
-    use super::bounded;
+    use crate::policy_channel_bounded;
 
     #[derive(Debug)]
     enum Message {
@@ -102,7 +197,7 @@ mod test {
 
     #[test]
     fn test_delivery_policy_optional() {
-        let (tx, rx) = bounded::<Message>(1);
+        let (tx, rx) = policy_channel_bounded!(1);
         thread::spawn(move || {
             for _ in 0..10 {
                 tx.send(Message::Test(123)).unwrap();
@@ -126,7 +221,7 @@ mod test {
 
     #[test]
     fn test_delivery_policy_single() {
-        let (tx, rx) = bounded::<Message>(512);
+        let (tx, rx) = policy_channel_bounded!(512);
         thread::spawn(move || {
             for _ in 0..10 {
                 tx.send(Message::Test(123)).unwrap();
@@ -154,7 +249,7 @@ mod test {
     fn test_poisoning() {
         let n = 5_000;
         for i in 0..n {
-            let (tx, rx) = bounded::<Message>(512);
+            let super::Bounded { tx, rx }: super::Bounded<Message> = super::Bounded::new(512);
             let rx_t = thread::spawn(move || while rx.recv().is_ok() {});
             thread::spawn(move || {
                 let _t = tx;
@@ -167,5 +262,15 @@ mod test {
             }
             assert!(rx_t.is_finished(), "RX poisined {}", i);
         }
+    }
+
+    #[test]
+    fn test_other_mutex() {
+        let (tx, rx) =
+            super::bounded::<usize, parking_lot_rt::RawMutex, parking_lot_rt::Condvar>(1);
+        tx.send(42).unwrap();
+        assert_eq!(rx.recv().unwrap(), 42);
+        assert!(tx.is_empty());
+        assert!(rx.is_empty());
     }
 }

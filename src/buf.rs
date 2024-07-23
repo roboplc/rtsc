@@ -1,23 +1,45 @@
 use std::collections::VecDeque;
 
-use crate::locking::Mutex;
+use crate::locking::RawMutex;
+
+use lock_api::RawMutex as RawMutexTrait;
 
 /// A capacity-limited thread-safe deque-based data buffer
-pub struct DataBuffer<T> {
-    data: Mutex<VecDeque<T>>,
+pub struct DataBuffer<T, M = RawMutex> {
+    data: lock_api::Mutex<M, VecDeque<T>>,
     capacity: usize,
+    preallocated: bool,
 }
 
-impl<T> DataBuffer<T> {
+impl<T, M> DataBuffer<T, M>
+where
+    M: RawMutexTrait,
+{
+    /// Creates a new bounded data buffer. The buffer is always allocated dynamically
+    ///
     /// # Panics
     ///
     /// Will panic if the capacity is zero
-    #[inline]
-    pub fn bounded(capacity: usize) -> Self {
+    pub const fn bounded(capacity: usize) -> Self {
         assert!(capacity > 0, "data buffer capacity MUST be > 0");
         Self {
-            data: <_>::default(),
+            data: lock_api::Mutex::const_new(M::INIT, VecDeque::new()),
             capacity,
+            preallocated: false,
+        }
+    }
+    /// Creates a new bounded pre-allocated data buffer. the buffer is pre-allocated on creation
+    /// and at taking the content
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the capacity is zero
+    pub fn bounded_prealloc(capacity: usize) -> Self {
+        assert!(capacity > 0, "data buffer capacity MUST be > 0");
+        Self {
+            data: lock_api::Mutex::const_new(M::INIT, VecDeque::with_capacity(capacity)),
+            capacity,
+            preallocated: true,
         }
     }
     /// Tries to push the value
@@ -54,6 +76,40 @@ impl<T> DataBuffer<T> {
     }
     /// takes the buffer content and keeps nothing inside
     pub fn take(&self) -> VecDeque<T> {
-        std::mem::take(&mut *self.data.lock())
+        std::mem::replace(
+            &mut *self.data.lock(),
+            if self.preallocated {
+                VecDeque::with_capacity(self.capacity)
+            } else {
+                VecDeque::new()
+            },
+        )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_data_buffer() {
+        let buf: DataBuffer<_> = DataBuffer::bounded(3);
+        assert_eq!(buf.len(), 0);
+        buf.try_push(1);
+        assert_eq!(buf.len(), 1);
+        buf.try_push(2);
+        assert_eq!(buf.len(), 2);
+        buf.try_push(3);
+        assert_eq!(buf.len(), 3);
+        buf.try_push(4);
+        assert_eq!(buf.len(), 3);
+        assert_eq!(buf.take(), vec![1, 2, 3]);
+        assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn test_data_buffer_other_mutex() {
+        let buf: DataBuffer<i32, parking_lot_rt::RawMutex> = DataBuffer::bounded(3);
+        assert_eq!(buf.len(), 0);
     }
 }

@@ -1,39 +1,56 @@
-use crate::{Error, Result};
+use crate::{
+    condvar_api::RawCondvar,
+    locking::{Condvar, RawMutex},
+    Error, Result,
+};
+use lock_api::RawMutex as RawMutexTrait;
 use std::{sync::Arc, time::Duration};
-
-use crate::locking::{Condvar, Mutex};
 
 struct CellValue<P> {
     current: Option<P>,
     closed: bool,
 }
 
-struct DataCellInner<P> {
-    value: Mutex<CellValue<P>>,
-    data_available: Condvar,
+impl<P> Default for CellValue<P> {
+    fn default() -> Self {
+        Self {
+            current: None,
+            closed: false,
+        }
+    }
+}
+
+struct DataCellInner<P, M, CV> {
+    value: lock_api::Mutex<M, CellValue<P>>,
+    data_available: CV,
 }
 
 /// A simple data cell that can be used to pass data between threads. Acts similarly to a
 /// ring-buffer channel with a capacity of 1.
-pub struct DataCell<P> {
-    inner: Arc<DataCellInner<P>>,
+pub struct DataCell<P, M = RawMutex, CV = Condvar> {
+    inner: Arc<DataCellInner<P, M, CV>>,
 }
 
-impl<P> Default for DataCell<P> {
+impl<P, M, CV> Default for DataCell<P, M, CV>
+where
+    M: RawMutexTrait,
+    CV: RawCondvar,
+{
     fn default() -> Self {
         Self {
             inner: Arc::new(DataCellInner {
-                value: Mutex::new(CellValue {
-                    current: None,
-                    closed: false,
-                }),
-                data_available: Condvar::new(),
+                value: <_>::default(),
+                data_available: CV::new(),
             }),
         }
     }
 }
 
-impl<P> Clone for DataCell<P> {
+impl<P, M, CV> Clone for DataCell<P, M, CV>
+where
+    M: RawMutexTrait,
+    CV: RawCondvar,
+{
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -41,7 +58,11 @@ impl<P> Clone for DataCell<P> {
     }
 }
 
-impl<P> DataCell<P> {
+impl<P, M, CV> DataCell<P, M, CV>
+where
+    M: RawMutexTrait,
+    CV: RawCondvar + RawCondvar<RawMutex = M>,
+{
     /// Creates a new data cell
     pub fn new() -> Self {
         Self::default()
@@ -80,7 +101,9 @@ impl<P> DataCell<P> {
             if let Some(current) = value.current.take() {
                 return Ok(current);
             }
-            self.inner.data_available.wait(&mut value);
+            self.inner
+                .data_available
+                .wait::<CellValue<P>, M>(&mut value);
         }
     }
     /// Retrieves the data from the cell with the given timeout
@@ -96,7 +119,7 @@ impl<P> DataCell<P> {
             if self
                 .inner
                 .data_available
-                .wait_for(&mut value, timeout)
+                .wait_for::<CellValue<P>, M>(&mut value, timeout)
                 .timed_out()
             {
                 return Err(Error::Timeout);
@@ -113,7 +136,11 @@ impl<P> DataCell<P> {
     }
 }
 
-impl<P> Iterator for DataCell<P> {
+impl<P, M, CV> Iterator for DataCell<P, M, CV>
+where
+    M: RawMutexTrait,
+    CV: RawCondvar + RawCondvar<RawMutex = M>,
+{
     type Item = P;
     fn next(&mut self) -> Option<Self::Item> {
         self.get().ok()
@@ -131,7 +158,7 @@ mod test {
 
     #[test]
     fn test_datacell() {
-        let cell = DataCell::new();
+        let cell: DataCell<_> = DataCell::new();
         let cell2 = cell.clone();
         let handle = thread::spawn(move || {
             thread::sleep(Duration::from_millis(100));
@@ -143,7 +170,7 @@ mod test {
 
     #[test]
     fn test_datacell_close() {
-        let cell = DataCell::new();
+        let cell: DataCell<_> = DataCell::new();
         let cell2 = cell.clone();
         let handle = thread::spawn(move || {
             cell2.set(42);
@@ -155,7 +182,7 @@ mod test {
 
     #[test]
     fn test_datacell_try_get() {
-        let cell = DataCell::new();
+        let cell: DataCell<_> = DataCell::new();
         assert_eq!(cell.try_get().unwrap_err(), Error::ChannelEmpty);
         let cell2 = cell.clone();
         let handle = thread::spawn(move || {
@@ -163,5 +190,12 @@ mod test {
         });
         handle.join().unwrap();
         assert_eq!(cell.try_get().unwrap(), 42);
+    }
+
+    #[test]
+    fn test_datacell_other_mutex() {
+        let cell: DataCell<_, parking_lot_rt::RawMutex, parking_lot_rt::Condvar> = DataCell::new();
+        cell.set(42);
+        assert_eq!(cell.get().unwrap(), 42);
     }
 }

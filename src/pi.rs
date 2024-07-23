@@ -5,7 +5,9 @@ use std::{
 };
 
 use linux_futex::{AsFutex as _, Futex, PiFutex, Private, TimedWaitError, WaitError};
-use lock_api::{GuardSend, RawMutex, RawMutexTimed};
+use lock_api::{GuardSend, RawMutex as RawMutexTrait, RawMutexTimed};
+
+use crate::condvar_api::{RawCondvar, WaitTimeoutResult};
 
 thread_local! {
     #[allow(clippy::cast_possible_truncation)]
@@ -15,19 +17,6 @@ thread_local! {
 #[inline]
 fn tid() -> libc::pid_t {
     TID.with(|it| *it)
-}
-
-/// Result, returned by [`Condvar::wait_for`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WaitTimeoutResult {
-    timed_out: bool,
-}
-
-impl WaitTimeoutResult {
-    /// Returns `true` if the wait timed out.
-    pub fn timed_out(&self) -> bool {
-        self.timed_out
-    }
 }
 
 /// Priority-inheritance based Condvar implementation for the priority-inheritance [`Mutex`].
@@ -86,12 +75,12 @@ impl Condvar {
             let now = Instant::now();
             loop {
                 let Some(remaining) = timeout.checked_sub(now.elapsed()) else {
-                    break WaitTimeoutResult { timed_out: true };
+                    break WaitTimeoutResult::new(true)
                 };
                 unlock!();
                 match fx.wait_for(0, remaining) {
-                    Ok(()) => break WaitTimeoutResult { timed_out: false },
-                    Err(TimedWaitError::TimedOut) => break WaitTimeoutResult { timed_out: true },
+                    Ok(()) => break WaitTimeoutResult::new(false),
+                    Err(TimedWaitError::TimedOut) => break WaitTimeoutResult::new(true),
                     Err(TimedWaitError::Interrupted) => continue,
                     Err(TimedWaitError::WrongValue) => unreachable!(),
                 }
@@ -100,7 +89,7 @@ impl Condvar {
             loop {
                 unlock!();
                 match fx.wait(0) {
-                    Ok(()) => break WaitTimeoutResult { timed_out: false },
+                    Ok(()) => break WaitTimeoutResult::new(false),
                     Err(WaitError::Interrupted) => continue,
                     Err(WaitError::WrongValue) => unreachable!(),
                 }
@@ -231,7 +220,7 @@ impl PiLock {
     }
 }
 
-unsafe impl RawMutex for PiLock {
+unsafe impl RawMutexTrait for PiLock {
     #[allow(clippy::declare_interior_mutable_const)]
     const INIT: Self = Self {
         futex: PiFutex::new(0),
@@ -291,6 +280,33 @@ unsafe impl RawMutexTimed for PiLock {
 pub type Mutex<T> = lock_api::Mutex<PiLock, T>;
 /// Priority-inheritance based mutex guard.
 pub type MutexGuard<'a, T> = lock_api::MutexGuard<'a, PiLock, T>;
+
+/// Compatibility name
+pub type RawMutex = PiLock;
+
+impl RawCondvar for Condvar {
+    type RawMutex = PiLock;
+
+    fn new() -> Self {
+        Self::new()
+    }
+
+    fn wait<T, M>(&self, guard: &mut MutexGuard<T>) {
+        self.wait(guard);
+    }
+
+    fn wait_for<T, M>(&self, guard: &mut MutexGuard<T>, timeout: Duration) -> WaitTimeoutResult {
+        self.wait_for(guard, timeout)
+    }
+
+    fn notify_one(&self) {
+        self.notify_one();
+    }
+
+    fn notify_all(&self) {
+        self.notify_all();
+    }
+}
 
 #[cfg(test)]
 mod tests {

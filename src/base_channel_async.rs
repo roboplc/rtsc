@@ -12,9 +12,9 @@ use std::{
     time::Duration,
 };
 
-use crate::locking::{Condvar, Mutex};
 use crate::{base_channel::ChannelStorage, data_policy::StorageTryPushOutput, Error, Result};
 use object_id::UniqueId;
+use parking_lot_rt::{Condvar, Mutex};
 use pin_project::{pin_project, pinned_drop};
 
 type ClientId = usize;

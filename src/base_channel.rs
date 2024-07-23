@@ -1,7 +1,9 @@
 use std::{marker::PhantomData, sync::Arc, time::Duration};
 
-use crate::locking::{Condvar, Mutex};
+use crate::condvar_api::RawCondvar;
+use crate::locking::{Condvar, RawMutex};
 use crate::{data_policy::StorageTryPushOutput, Error, Result};
+use lock_api::RawMutex as RawMutexTrait;
 use object_id::UniqueId;
 
 /// Channel storage trait
@@ -38,10 +40,12 @@ pub trait DataChannel<T: Sized> {
     }
 }
 
-impl<T, S> DataChannel<T> for BaseSender<T, S>
+impl<T, S, M, CV> DataChannel<T> for BaseSender<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar + RawCondvar<RawMutex = M>,
 {
     fn send(&self, value: T) -> Result<()> {
         self.send(value)
@@ -60,10 +64,12 @@ where
     }
 }
 
-impl<T, S> DataChannel<T> for BaseReceiver<T, S>
+impl<T, S, M, CV> DataChannel<T> for BaseReceiver<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar + RawCondvar<RawMutex = M>,
 {
     fn send(&self, _value: T) -> Result<()> {
         Err(Error::Unimplemented)
@@ -83,60 +89,77 @@ where
 }
 
 /// Base channel implementation
-pub struct BaseChannel<T: Sized, S: ChannelStorage<T>>(Arc<ChannelInner<T, S>>);
+pub struct BaseChannel<T: Sized, S: ChannelStorage<T>, M = RawMutex, CV = Condvar>(
+    Arc<ChannelInner<T, S, M, CV>>,
+)
+where
+    M: RawMutexTrait,
+    CV: RawCondvar;
 
-impl<T, S> BaseChannel<T, S>
+impl<T, S, M, CV> BaseChannel<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar,
 {
     fn id(&self) -> usize {
         self.0.id.as_usize()
     }
 }
 
-impl<T, S> Eq for BaseChannel<T, S>
+impl<T, S, M, CV> Eq for BaseChannel<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar,
 {
 }
 
-impl<T, S> PartialEq for BaseChannel<T, S>
+impl<T, S, M, CV> PartialEq for BaseChannel<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar,
 {
     fn eq(&self, other: &Self) -> bool {
         self.id() == other.id()
     }
 }
 
-impl<T, S> Clone for BaseChannel<T, S>
+impl<T, S, M, CV> Clone for BaseChannel<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar,
 {
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
 }
 
-struct ChannelInner<T, S>
+struct ChannelInner<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar,
 {
     id: UniqueId,
-    data: Mutex<InnerData<T, S>>,
-    data_available: Condvar,
-    space_available: Condvar,
+    data: lock_api::Mutex<M, InnerData<T, S>>,
+    data_available: CV,
+    space_available: CV,
 }
 
-impl<T, S> ChannelInner<T, S>
+impl<T, S, M, CV> ChannelInner<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar + RawCondvar<RawMutex = M>,
 {
     fn send(&self, mut value: T) -> Result<()> {
         let mut data = self.data.lock();
@@ -149,7 +172,7 @@ where
                 break push_result;
             };
             value = val;
-            self.space_available.wait(&mut data);
+            self.space_available.wait::<InnerData<T, S>, M>(&mut data);
         };
         match pushed {
             StorageTryPushOutput::Pushed => {
@@ -171,7 +194,11 @@ where
                 break push_result;
             };
             value = val;
-            if self.space_available.wait_for(&mut pc, timeout).timed_out() {
+            if self
+                .space_available
+                .wait_for::<InnerData<T, S>, M>(&mut pc, timeout)
+                .timed_out()
+            {
                 return Err(Error::Timeout);
             }
         };
@@ -207,7 +234,7 @@ where
             } else if data.senders == 0 {
                 return Err(Error::ChannelClosed);
             }
-            self.data_available.wait(&mut data);
+            self.data_available.wait::<InnerData<T, S>, M>(&mut data);
         }
     }
     fn recv_timeout(&self, timeout: Duration) -> Result<T> {
@@ -219,7 +246,11 @@ where
             } else if data.senders == 0 {
                 return Err(Error::ChannelClosed);
             }
-            if self.data_available.wait_for(&mut data, timeout).timed_out() {
+            if self
+                .data_available
+                .wait_for::<InnerData<T, S>, M>(&mut data, timeout)
+                .timed_out()
+            {
                 return Err(Error::Timeout);
             };
         }
@@ -237,19 +268,21 @@ where
     }
 }
 
-impl<T, S> BaseChannel<T, S>
+impl<T, S, M, CV> BaseChannel<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar,
 {
     /// Creates a new channel with the specified capacity and ordering
     pub fn new(capacity: usize, ordering: bool) -> Self {
         Self(
             ChannelInner {
                 id: <_>::default(),
-                data: Mutex::new(InnerData::new(capacity, ordering)),
-                data_available: Condvar::new(),
-                space_available: Condvar::new(),
+                data: lock_api::Mutex::const_new(M::INIT, InnerData::new(capacity, ordering)),
+                data_available: CV::new(),
+                space_available: CV::new(),
             }
             .into(),
         )
@@ -284,18 +317,22 @@ where
 
 /// Base channel sender
 #[derive(Eq, PartialEq)]
-pub struct BaseSender<T, S>
+pub struct BaseSender<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar,
 {
-    channel: BaseChannel<T, S>,
+    channel: BaseChannel<T, S, M, CV>,
 }
 
-impl<T, S> BaseSender<T, S>
+impl<T, S, M, CV> BaseSender<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar + RawCondvar<RawMutex = M>,
 {
     /// Sends a value to the channel
     #[inline]
@@ -334,10 +371,12 @@ where
     }
 }
 
-impl<T, S> Clone for BaseSender<T, S>
+impl<T, S, M, CV> Clone for BaseSender<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar,
 {
     fn clone(&self) -> Self {
         self.channel.0.data.lock().senders += 1;
@@ -347,10 +386,12 @@ where
     }
 }
 
-impl<T, S> Drop for BaseSender<T, S>
+impl<T, S, M, CV> Drop for BaseSender<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar,
 {
     fn drop(&mut self) {
         let mut pc = self.channel.0.data.lock();
@@ -363,18 +404,22 @@ where
 
 /// Base channel receiver
 #[derive(Eq, PartialEq)]
-pub struct BaseReceiver<T, S>
+pub struct BaseReceiver<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar,
 {
-    channel: BaseChannel<T, S>,
+    channel: BaseChannel<T, S, M, CV>,
 }
 
-impl<T, S> Iterator for BaseReceiver<T, S>
+impl<T, S, M, CV> Iterator for BaseReceiver<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar + RawCondvar<RawMutex = M>,
 {
     type Item = T;
     fn next(&mut self) -> Option<Self::Item> {
@@ -382,10 +427,12 @@ where
     }
 }
 
-impl<T, S> BaseReceiver<T, S>
+impl<T, S, M, CV> BaseReceiver<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar + RawCondvar<RawMutex = M>,
 {
     /// Receives a value from the channel
     #[inline]
@@ -424,10 +471,12 @@ where
     }
 }
 
-impl<T, S> Clone for BaseReceiver<T, S>
+impl<T, S, M, CV> Clone for BaseReceiver<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar,
 {
     fn clone(&self) -> Self {
         self.channel.0.data.lock().receivers += 1;
@@ -437,10 +486,12 @@ where
     }
 }
 
-impl<T, S> Drop for BaseReceiver<T, S>
+impl<T, S, M, CV> Drop for BaseReceiver<T, S, M, CV>
 where
     T: Sized,
     S: ChannelStorage<T>,
+    M: RawMutexTrait,
+    CV: RawCondvar,
 {
     fn drop(&mut self) {
         let mut pc = self.channel.0.data.lock();
@@ -451,12 +502,17 @@ where
     }
 }
 
-pub(crate) fn make_channel<T: Sized, S: ChannelStorage<T>>(
-    ch: BaseChannel<T, S>,
-) -> (BaseSender<T, S>, BaseReceiver<T, S>) {
-    let tx = BaseSender {
+#[allow(clippy::type_complexity)]
+pub(crate) fn make_channel<T: Sized, S: ChannelStorage<T>, M, CV>(
+    ch: BaseChannel<T, S, M, CV>,
+) -> (BaseSender<T, S, M, CV>, BaseReceiver<T, S, M, CV>)
+where
+    M: RawMutexTrait,
+    CV: RawCondvar,
+{
+    let tx: BaseSender<T, S, M, CV> = BaseSender {
         channel: ch.clone(),
     };
-    let rx = BaseReceiver { channel: ch };
+    let rx: BaseReceiver<T, S, M, CV> = BaseReceiver { channel: ch };
     (tx, rx)
 }

@@ -1,7 +1,11 @@
-use crate::{Error, Result};
 use std::{sync::Arc, time::Duration};
 
-use crate::locking::{Condvar, Mutex};
+use crate::{
+    condvar_api::RawCondvar,
+    locking::{Condvar, RawMutex},
+    Error, Result,
+};
+use lock_api::RawMutex as RawMutexTrait;
 
 struct CellValue<P, S> {
     primary: Option<P>,
@@ -19,29 +23,37 @@ impl<P, S> Default for CellValue<P, S> {
     }
 }
 
-struct CouplerInner<P, S> {
-    value: Mutex<CellValue<P, S>>,
-    data_available: Condvar,
+struct CouplerInner<P, S, M, CV> {
+    value: lock_api::Mutex<M, CellValue<P, S>>,
+    data_available: CV,
 }
 
 /// Data coupler, which combines [`crate::cell::DataCell`] functionality with a secondary data
 /// value. The primary value is combined with the secondary, the secondary may not be present.
-pub struct Coupler<P, S> {
-    inner: Arc<CouplerInner<P, S>>,
+pub struct Coupler<P, S, M = RawMutex, CV = Condvar> {
+    inner: Arc<CouplerInner<P, S, M, CV>>,
 }
 
-impl<P, S> Default for Coupler<P, S> {
+impl<P, S, M, CV> Default for Coupler<P, S, M, CV>
+where
+    M: RawMutexTrait,
+    CV: RawCondvar,
+{
     fn default() -> Self {
         Self {
             inner: Arc::new(CouplerInner {
-                value: Mutex::new(CellValue::default()),
-                data_available: Condvar::new(),
+                value: <_>::default(),
+                data_available: CV::new(),
             }),
         }
     }
 }
 
-impl<P, S> Clone for Coupler<P, S> {
+impl<P, S, M, CV> Clone for Coupler<P, S, M, CV>
+where
+    M: RawMutexTrait,
+    CV: RawCondvar,
+{
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -49,7 +61,11 @@ impl<P, S> Clone for Coupler<P, S> {
     }
 }
 
-impl<P, S> Coupler<P, S> {
+impl<P, S, M, CV> Coupler<P, S, M, CV>
+where
+    M: RawMutexTrait,
+    CV: RawCondvar + RawCondvar<RawMutex = M>,
+{
     /// Creates a new coupler
     pub fn new() -> Self {
         Self::default()
@@ -98,7 +114,9 @@ impl<P, S> Coupler<P, S> {
             if let Some(primary) = value.primary.take() {
                 return Ok((primary, value.second.take()));
             }
-            self.inner.data_available.wait(&mut value);
+            self.inner
+                .data_available
+                .wait::<CellValue<P, S>, M>(&mut value);
         }
     }
     /// Retrieves the primary and secondary values from the cell with the given timeout
@@ -114,7 +132,7 @@ impl<P, S> Coupler<P, S> {
             if self
                 .inner
                 .data_available
-                .wait_for(&mut value, timeout)
+                .wait_for::<CellValue<P, S>, M>(&mut value, timeout)
                 .timed_out()
             {
                 return Err(Error::Timeout);
@@ -149,7 +167,7 @@ mod test {
 
     #[test]
     fn test_coupler() {
-        let cell = Coupler::new();
+        let cell: Coupler<_, _> = Coupler::new();
         let cell2 = cell.clone();
         let handle = thread::spawn(move || {
             thread::sleep(Duration::from_millis(100));
@@ -174,7 +192,7 @@ mod test {
 
     #[test]
     fn test_coupler_try_get() {
-        let cell = Coupler::new();
+        let cell: Coupler<_, _> = Coupler::new();
         assert_eq!(cell.try_get().unwrap_err(), Error::ChannelEmpty);
         let cell2 = cell.clone();
         let handle = thread::spawn(move || {
@@ -183,5 +201,14 @@ mod test {
         });
         handle.join().unwrap();
         assert_eq!(cell.try_get().unwrap(), (42, Some(33)));
+    }
+
+    #[test]
+    fn test_coupler_other_mutex() {
+        let cell: Coupler<_, _, parking_lot_rt::RawMutex, parking_lot_rt::Condvar> = Coupler::new();
+        let _cell2 = cell.clone();
+        cell.set_second(33);
+        cell.set(42);
+        assert_eq!(cell.get().unwrap(), (42, Some(33)));
     }
 }
