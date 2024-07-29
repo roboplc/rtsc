@@ -137,8 +137,8 @@ impl Condvar {
 // operation so it should be called as less as possible (ideal case is <=2).
 //
 // The initial 50us quant has been chosen as a trade-off between performance and fairness. It is
-// proven to be enough to let a waiter with sched=1 to enter the futex from the first time even if
-// the notify thread is spinning with sched=99 (in case if both are on the same CPU).
+// proven to be enough to let a waiter with sched=1 to enter the futex.wait() from the first time
+// even if the notify thread is spinning with sched=99 (in case if both are on the same CPU).
 //
 // Tested on: ARM Cortex-A53, ARM Cortex-A72
 //
