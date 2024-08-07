@@ -70,7 +70,7 @@ spin-waiting. The module is re-exported as [`locking`] as well.
 
 ### Custom locking policy
 
-The crate components components provide API to specify 3rd party Mutex/Condvar
+The crate components provide API to specify 3rd party Mutex/Condvar
 implementation.
 
 ```rust
