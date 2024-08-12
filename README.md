@@ -37,7 +37,8 @@ This allows to use RTSC components in various environments, e.g.:
   systems except Linux).
 
 * For safety-critical real-time use the provided [`pi`] components which
-  support priority inheritance (default for Linux, works on Linux only).
+  support priority inheritance (default for Linux, works on Linux only,
+  recommended Kernel 5.14+).
 
 * For latency-critical real-time use spin-based locks.
 
