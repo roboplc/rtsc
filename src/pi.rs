@@ -73,11 +73,11 @@ impl Condvar {
         let fx: &Futex<Private> = self.fx.as_futex();
         let result = if let Some(timeout) = timeout {
             let now = Instant::now();
+            unlock!();
             loop {
                 let Some(remaining) = timeout.checked_sub(now.elapsed()) else {
                     break WaitTimeoutResult::new(true)
                 };
-                unlock!();
                 match fx.wait_for(0, remaining) {
                     Ok(()) => break WaitTimeoutResult::new(false),
                     Err(TimedWaitError::TimedOut) => break WaitTimeoutResult::new(true),
@@ -86,8 +86,8 @@ impl Condvar {
                 }
             }
         } else {
+            unlock!();
             loop {
-                unlock!();
                 match fx.wait(0) {
                     Ok(()) => break WaitTimeoutResult::new(false),
                     Err(WaitError::Interrupted) => continue,
