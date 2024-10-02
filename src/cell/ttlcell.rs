@@ -2,7 +2,7 @@ use bma_ts::Monotonic;
 use core::fmt;
 use std::{ops::Deref, time::Duration};
 
-/// A memory ce;ll with an expiring value with API similar to the standard [`Option`]
+/// A memory cell with an expiring value with API similar to the standard [`Option`]
 pub struct TtlCell<T> {
     value: Option<T>,
     ttl: Duration,
