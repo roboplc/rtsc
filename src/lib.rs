@@ -37,6 +37,8 @@ pub mod condvar_api;
 pub mod ops;
 /// Policy-based deque
 pub mod pdeque;
+/// Thread scheduling
+pub mod thread_rt;
 
 pub use base_channel::DataChannel;
 
@@ -70,6 +72,9 @@ pub enum Error {
     /// All other errors
     #[error("operation failed: {0}")]
     Failed(String),
+    /// System call or internal API access denied
+    #[error("access denied")]
+    AccessDenied,
 }
 
 /// Result type
