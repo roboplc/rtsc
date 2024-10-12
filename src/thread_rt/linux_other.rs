@@ -19,7 +19,7 @@ impl From<Scheduling> for ChrtSchedArgument {
 /// Apply the thread scheduler and CPU affinity parameters for the current thread
 pub fn apply_for_current(params: &Params) -> Result<()> {
     let tid = unsafe { i32::try_from(libc::syscall(libc::SYS_gettid)) }
-        .ok_or(Error::Failed("Failed to get thread ID".to_string()))?;
+        .map_err(|e| Error::Failed(e.to_string()))?;
     apply(tid, params)
 }
 
@@ -32,7 +32,14 @@ pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
         }
         let result = std::process::Command::new("taskset")
             .arg("-p")
-            .arg(&params.cpu_ids.join(","))
+            .arg(
+                &params
+                    .cpu_ids
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(","),
+            )
             .arg(tid.to_string())
             .status()
             .map_err(|e| Error::Failed(format!("CPU affinity set error (taskset): {}", e)))?;
