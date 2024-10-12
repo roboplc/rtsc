@@ -1,3 +1,4 @@
+use super::Params;
 use crate::{Error, Result};
 
 /// Apply the thread scheduler and CPU affinity parameters for the current thread
