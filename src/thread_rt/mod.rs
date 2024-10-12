@@ -1,3 +1,5 @@
+use crate::Result;
+
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 #[path = "linux_gnu.rs"]
 mod os;
@@ -9,8 +11,6 @@ mod os;
 #[cfg(not(target_os = "linux"))]
 #[path = "unsupported.rs"]
 mod os;
-
-pub use os::{apply, apply_for_current};
 
 /// Thread scheduler and CPU affinity parameters
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -36,4 +36,16 @@ pub enum Scheduling {
     #[default]
     /// Other
     Other,
+}
+
+/// Apply the thread scheduler and CPU affinity parameters for the current thread
+#[inline]
+pub fn apply_for_current(params: &Params) -> Result<()> {
+    os::apply_for_current(params)
+}
+
+/// Apply the thread scheduler and CPU affinity parameters
+#[inline]
+pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
+    os::apply(tid, params)
 }

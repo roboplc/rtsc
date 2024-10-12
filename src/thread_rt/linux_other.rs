@@ -16,14 +16,12 @@ impl From<Scheduling> for ChrtSchedArgument {
     }
 }
 
-/// Apply the thread scheduler and CPU affinity parameters for the current thread
 pub fn apply_for_current(params: &Params) -> Result<()> {
     let tid = unsafe { i32::try_from(libc::syscall(libc::SYS_gettid)) }
         .map_err(|e| Error::Failed(e.to_string()))?;
     apply(tid, params)
 }
 
-/// Apply the thread scheduler and CPU affinity parameters
 pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
     let user_id = unsafe { libc::getuid() };
     if !params.cpu_ids.is_empty() {

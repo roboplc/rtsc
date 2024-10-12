@@ -14,12 +14,10 @@ impl From<Scheduling> for libc::c_int {
     }
 }
 
-/// Apply the thread scheduler and CPU affinity parameters for the current thread
 pub fn apply_for_current(params: &Params) -> Result<()> {
     apply(0, params)
 }
 
-/// Apply the thread scheduler and CPU affinity parameters
 pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
     let user_id = unsafe { libc::getuid() };
     if !params.cpu_ids.is_empty() {
