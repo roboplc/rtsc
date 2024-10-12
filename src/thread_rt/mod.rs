@@ -15,9 +15,12 @@ mod os;
 /// Thread scheduler and CPU affinity parameters
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct Params {
-    priority: Option<i32>,
-    scheduling: Scheduling,
-    cpu_ids: Vec<usize>,
+    /// Thread priority
+    pub priority: Option<i32>,
+    /// Thread scheduler policy
+    pub scheduling: Scheduling,
+    /// CPU affinity
+    pub cpu_ids: Vec<usize>,
 }
 
 /// Scheduling policy (Linux)
