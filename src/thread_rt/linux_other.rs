@@ -29,7 +29,7 @@ pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
             return Err(Error::AccessDenied);
         }
         let result = std::process::Command::new("taskset")
-            .arg("-p")
+            .arg("-cp")
             .arg(
                 &params
                     .cpu_ids
