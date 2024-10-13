@@ -60,12 +60,6 @@ pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
             )));
         }
     }
-    if params.preallocated_heap > 0 {
-        if user_id != 0 {
-            return Err(Error::AccessDenied);
-        }
-        prealloc_heap(params.preallocated_heap)?;
-    }
     Ok(())
 }
 

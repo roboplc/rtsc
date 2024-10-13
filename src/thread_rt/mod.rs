@@ -21,8 +21,6 @@ pub struct Params {
     scheduling: Scheduling,
     /// CPU affinity
     cpu_ids: Vec<usize>,
-    /// Preallocated heap memory size
-    preallocated_heap: usize,
 }
 
 impl Params {
@@ -45,11 +43,6 @@ impl Params {
         self.cpu_ids = cpu_ids.to_vec();
         self
     }
-    /// Set the preallocated heap memory size
-    pub fn with_preallocated_heap(mut self, preallocated_heap: usize) -> Self {
-        self.preallocated_heap = preallocated_heap;
-        self
-    }
     /// Get the thread priority
     pub fn priority(&self) -> Option<i32> {
         self.priority
@@ -61,10 +54,6 @@ impl Params {
     /// Get the CPU affinity
     pub fn cpu_ids(&self) -> &[usize] {
         &self.cpu_ids
-    }
-    /// Get the preallocated heap memory size
-    pub fn preallocated_heap(&self) -> usize {
-        self.preallocated_heap
     }
 }
 
@@ -92,7 +81,8 @@ pub fn apply_for_current(params: &Params) -> Result<()> {
     os::apply_for_current(params)
 }
 
-/// Apply the thread scheduler and CPU affinity parameters
+/// Apply the thread scheduler and CPU affinity parameters for a given thread. heap preallocation
+/// is ignored
 #[inline]
 pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
     os::apply(tid, params)
