@@ -41,8 +41,8 @@ impl Params {
         self
     }
     /// Set the CPU affinity
-    pub fn with_cpu_ids<I: Iterator<Item = usize>>(mut self, cpu_ids: I) -> Self {
-        self.cpu_ids = cpu_ids.into_iter().collect();
+    pub fn with_cpu_ids(mut self, cpu_ids: &[usize]) -> Self {
+        self.cpu_ids = cpu_ids.to_vec();
         self
     }
     /// Set the preallocated heap memory size
