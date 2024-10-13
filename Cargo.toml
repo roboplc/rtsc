@@ -1,6 +1,6 @@
 [package]
 name = "rtsc"
-version = "0.3.8"
+version = "0.3.9"
 edition = "2021"
 authors = ["Serhij S. <div@altertech.com>"]
 license = "Apache-2.0"

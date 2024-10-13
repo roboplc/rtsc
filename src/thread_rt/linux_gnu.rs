@@ -67,6 +67,10 @@ pub fn prealloc_heap(size: usize) -> Result<()> {
     if size == 0 {
         return Ok(());
     }
+    let user_id = unsafe { libc::getuid() };
+    if user_id != 0 {
+        return Err(Error::AccessDenied);
+    }
     let page_size = unsafe {
         if libc::mallopt(libc::M_MMAP_MAX, 0) != 1 {
             return Err(Error::Failed(
