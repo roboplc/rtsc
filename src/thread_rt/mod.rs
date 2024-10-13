@@ -12,15 +12,60 @@ mod os;
 #[path = "unsupported.rs"]
 mod os;
 
-/// Thread scheduler and CPU affinity parameters
+/// Thread scheduler, CPU affinity and heap parameters
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct Params {
     /// Thread priority
-    pub priority: Option<i32>,
+    priority: Option<i32>,
     /// Thread scheduler policy
-    pub scheduling: Scheduling,
+    scheduling: Scheduling,
     /// CPU affinity
-    pub cpu_ids: Vec<usize>,
+    cpu_ids: Vec<usize>,
+    /// Preallocated heap memory size
+    preallocated_heap: usize,
+}
+
+impl Params {
+    /// Create a new instance of the parameters
+    pub fn new() -> Self {
+        Self::default()
+    }
+    /// Set the thread priority
+    pub fn with_priority(mut self, priority: Option<i32>) -> Self {
+        self.priority = priority;
+        self
+    }
+    /// Set the thread scheduler policy
+    pub fn with_scheduling(mut self, scheduling: Scheduling) -> Self {
+        self.scheduling = scheduling;
+        self
+    }
+    /// Set the CPU affinity
+    pub fn with_cpu_ids<I: Iterator<Item = usize>>(mut self, cpu_ids: I) -> Self {
+        self.cpu_ids = cpu_ids.into_iter().collect();
+        self
+    }
+    /// Set the preallocated heap memory size
+    pub fn with_preallocated_heap(mut self, preallocated_heap: usize) -> Self {
+        self.preallocated_heap = preallocated_heap;
+        self
+    }
+    /// Get the thread priority
+    pub fn priority(&self) -> Option<i32> {
+        self.priority
+    }
+    /// Get the thread scheduler policy
+    pub fn scheduling(&self) -> Scheduling {
+        self.scheduling
+    }
+    /// Get the CPU affinity
+    pub fn cpu_ids(&self) -> &[usize] {
+        &self.cpu_ids
+    }
+    /// Get the preallocated heap memory size
+    pub fn preallocated_heap(&self) -> usize {
+        self.preallocated_heap
+    }
 }
 
 /// Scheduling policy (Linux)
@@ -51,4 +96,18 @@ pub fn apply_for_current(params: &Params) -> Result<()> {
 #[inline]
 pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
     os::apply(tid, params)
+}
+
+/// The method preallocates a heap memory region with the given size. The method is useful to
+/// prevent memory fragmentation and speed up memory allocation. It is highly recommended to call
+/// the method at the beginning of the program.
+///
+/// Does nothing in simulated mode.
+///
+/// # Panics
+///
+/// Will panic if the page size is too large (more than usize)
+#[inline]
+pub fn preallocate_heap(size: usize) -> Result<()> {
+    os::prealloc_heap(size)
 }

@@ -71,5 +71,15 @@ pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
             )));
         }
     }
+    if params.preallocated_heap > 0 {
+        return Err(Error::Unimplemented);
+    }
     Ok(())
+}
+
+pub fn prealloc_heap(size: usize) -> Result<()> {
+    if size == 0 {
+        return Ok(());
+    }
+    Err(Error::Unimplemented)
 }

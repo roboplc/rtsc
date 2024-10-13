@@ -60,5 +60,38 @@ pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
             )));
         }
     }
+    if params.preallocated_heap > 0 {
+        if user_id != 0 {
+            return Err(Error::AccessDenied);
+        }
+        prealloc_heap(params.preallocated_heap)?;
+    }
+    Ok(())
+}
+
+pub fn prealloc_heap(size: usize) -> Result<()> {
+    if size == 0 {
+        return Ok(());
+    }
+    let page_size = unsafe {
+        if libc::mallopt(libc::M_MMAP_MAX, 0) != 1 {
+            return Err(Error::Failed(
+                "unable to disable mmap for allocation of large mem regions".to_owned(),
+            ));
+        }
+        if libc::mallopt(libc::M_TRIM_THRESHOLD, -1) != 1 {
+            return Err(Error::Failed("unable to disable trimming".to_owned()));
+        }
+        if libc::mlockall(libc::MCL_FUTURE) == -1 {
+            return Err(Error::Failed("unable to lock memory pages".to_owned()));
+        };
+        usize::try_from(libc::sysconf(libc::_SC_PAGESIZE)).expect("Page size too large")
+    };
+    let mut heap_mem = vec![0_u8; size];
+    std::hint::black_box(move || {
+        for i in (0..size).step_by(page_size) {
+            heap_mem[i] = 0xff;
+        }
+    })();
     Ok(())
 }
