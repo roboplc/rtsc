@@ -1,5 +1,5 @@
 use std::{
-    sync::atomic::{AtomicI32, AtomicU32, Ordering},
+    sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering},
     thread,
     time::{Duration, Instant},
 };
@@ -171,10 +171,17 @@ impl Backoff {
 #[allow(clippy::module_name_repetitions)]
 pub struct PiLock {
     futex: PiFutex<Private>,
+    blocked: AtomicBool,
 }
 
 impl PiLock {
     fn perform_lock(&self) {
+        if self.blocked.load(Ordering::SeqCst) {
+            // spin forever
+            loop {
+                thread::sleep(Duration::from_micros(1));
+            }
+        }
         let tid = tid();
         #[allow(clippy::cast_sign_loss)]
         let locked =
@@ -189,6 +196,9 @@ impl PiLock {
         }
     }
     fn perform_try_lock(&self) -> bool {
+        if self.blocked.load(Ordering::SeqCst) {
+            return false;
+        }
         let tid = tid();
         #[allow(clippy::cast_sign_loss)]
         let locked =
@@ -216,7 +226,13 @@ impl PiLock {
     }
     #[inline]
     fn is_locked(&self) -> bool {
-        self.futex.value.load(Ordering::SeqCst) != 0
+        self.blocked.load(Ordering::SeqCst) || self.futex.value.load(Ordering::SeqCst) != 0
+    }
+    /// Blocks the lock forever causing all lock attempts to spin (with a tiny delay to release
+    /// qants)
+    #[inline]
+    pub fn block_forever(&self) {
+        self.blocked.store(true, Ordering::SeqCst);
     }
 }
 
@@ -224,6 +240,7 @@ unsafe impl RawMutexTrait for PiLock {
     #[allow(clippy::declare_interior_mutable_const)]
     const INIT: Self = Self {
         futex: PiFutex::new(0),
+        blocked: AtomicBool::new(false),
     };
 
     type GuardMarker = GuardSend;
@@ -280,6 +297,13 @@ unsafe impl RawMutexTimed for PiLock {
 pub type Mutex<T> = lock_api::Mutex<PiLock, T>;
 /// Priority-inheritance based mutex guard.
 pub type MutexGuard<'a, T> = lock_api::MutexGuard<'a, PiLock, T>;
+
+/// Calls [`PiLock::block_forever`] on the given mutex.
+pub fn block_forever<T>(mutex: &Mutex<T>) {
+    unsafe {
+        mutex.raw().block_forever();
+    }
+}
 
 /// Compatibility name
 pub type RawMutex = PiLock;
@@ -460,6 +484,13 @@ mod tests {
             }
         }
     }
+    #[test]
+    fn test_block_forever() {
+        let mutex = Mutex::new(0);
+        super::block_forever(&mutex);
+        assert!(mutex.try_lock().is_none());
+    }
+
     #[test]
     fn test_condvar_timeout_wait_loop_notify_all() {
         for _ in 0..ITERS {
