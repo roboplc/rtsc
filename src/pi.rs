@@ -228,10 +228,8 @@ impl PiLock {
     fn is_locked(&self) -> bool {
         self.blocked.load(Ordering::SeqCst) || self.futex.value.load(Ordering::SeqCst) != 0
     }
-    /// Blocks the lock forever causing all lock attempts to spin (with a tiny delay to release
-    /// qants)
     #[inline]
-    pub fn block_forever(&self) {
+    fn block_forever(&self) {
         self.blocked.store(true, Ordering::SeqCst);
     }
 }
@@ -298,11 +296,16 @@ pub type Mutex<T> = lock_api::Mutex<PiLock, T>;
 /// Priority-inheritance based mutex guard.
 pub type MutexGuard<'a, T> = lock_api::MutexGuard<'a, PiLock, T>;
 
-/// Calls [`PiLock::block_forever`] on the given mutex.
-pub fn block_forever<T>(mutex: &Mutex<T>) {
+/// Leaks the mutex guard and returns a mutable reference to the data protected by the mutex.
+/// The lock is blocked forever causing all lock attempts to spin (with a tiny delay to release
+/// quants).
+pub fn block_forever<T>(guard: MutexGuard<T>) -> &mut T {
     unsafe {
-        mutex.raw().block_forever();
+        lock_api::MutexGuard::<'_, PiLock, T>::mutex(&guard)
+            .raw()
+            .block_forever();
     }
+    lock_api::MutexGuard::<'_, PiLock, T>::leak(guard)
 }
 
 /// Compatibility name
@@ -487,7 +490,10 @@ mod tests {
     #[test]
     fn test_block_forever() {
         let mutex = Mutex::new(0);
-        super::block_forever(&mutex);
+        {
+            let guard = mutex.lock();
+            super::block_forever(guard);
+        }
         assert!(mutex.try_lock().is_none());
     }
 
