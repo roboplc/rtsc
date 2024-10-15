@@ -179,7 +179,7 @@ impl PiLock {
         if self.blocked.load(Ordering::SeqCst) {
             // spin forever
             loop {
-                thread::sleep(Duration::from_micros(1));
+                thread::park();
             }
         }
         let tid = tid();
