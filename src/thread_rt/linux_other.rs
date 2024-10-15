@@ -1,5 +1,6 @@
 use super::{Params, Scheduling};
 use crate::{Error, Result};
+use std::process::Stdio;
 
 struct ChrtSchedArgument(&'static str);
 
@@ -29,6 +30,8 @@ pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
             return Err(Error::AccessDenied);
         }
         let result = std::process::Command::new("taskset")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .arg("-cp")
             .arg(
                 &params
@@ -58,6 +61,8 @@ pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
             params.scheduling
         };
         let result = std::process::Command::new("chrt")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .arg(ChrtSchedArgument::from(sched).0)
             .arg("-p")
             .arg(priority.to_string())
