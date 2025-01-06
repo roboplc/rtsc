@@ -1,6 +1,6 @@
 [package]
 name = "rtsc"
-version = "0.3.10"
+version = "0.3.11"
 edition = "2021"
 authors = ["Serhij S. <div@altertech.com>"]
 license = "Apache-2.0"
@@ -19,6 +19,7 @@ parking_lot_rt = "0.12"
 parking_lot = { version = "0.12.3", optional = true }
 lock_api = "0.4.12"
 libc = "0.2.155"
+tracing = "0.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 linux-futex = "1.0.0"
