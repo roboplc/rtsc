@@ -43,10 +43,10 @@ pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
             )
             .arg(tid.to_string())
             .status()
-            .map_err(|e| Error::Failed(format!("CPU affinity set error (taskset): {}", e)))?;
+            .map_err(|e| Error::RTSchedSetAffinity(e))?;
         if !result.success() {
-            return Err(Error::Failed(format!(
-                "CPU affinity set error (taskset): exit code {}",
+            return Err(Error::RTSchedSetAffinity(format!(
+                "taskset exit code {}",
                 result.code().unwrap_or(-1)
             )));
         }
@@ -68,10 +68,10 @@ pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
             .arg(priority.to_string())
             .arg(tid.to_string())
             .status()
-            .map_err(|e| Error::Failed(format!("Real-time priority set error (chrt): {}", e)))?;
+            .map_err(|e| Error::RTSchedSetScheduler(e))?;
         if !result.success() {
-            return Err(Error::Failed(format!(
-                "Real-time priority set error (chrt): exit code {}",
+            return Err(Error::RTSchedSetScheduler(format!(
+                "chrt exit code {}",
                 result.code().unwrap_or(-1)
             )));
         }

@@ -80,6 +80,12 @@ pub enum Error {
     /// I/O errors
     #[error("I/O error: {0}")]
     IO(#[from] std::io::Error),
+    /// CPU affinity set error
+    #[error("CPU affinity set error: {0}")]
+    RTSchedSetAffinity(String),
+    /// Real-time priority set error
+    #[error("Real-time priority set error: {0}")]
+    RTSchedSetScheduler(String),
 }
 
 /// Result type

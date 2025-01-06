@@ -31,7 +31,7 @@ pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
             }
             let res = libc::sched_setaffinity(tid, std::mem::size_of::<libc::cpu_set_t>(), &cpuset);
             if res != 0 {
-                return Err(Error::Failed(format!("CPU affinity set error: {}", res)));
+                return Err(Error::RTSchedSetAffinity(res.to_string()));
             }
         }
     }
@@ -54,10 +54,7 @@ pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
             )
         };
         if res != 0 {
-            return Err(Error::Failed(format!(
-                "Real-time priority set error: {}",
-                res
-            )));
+            return Err(Error::RTSchedSetScheduler(res.to_string()));
         }
     }
     Ok(())
