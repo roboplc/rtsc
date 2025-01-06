@@ -176,14 +176,14 @@ mod test {
             cell2.set(42);
         });
         cell.close();
-        assert_eq!(cell.get().unwrap_err(), Error::ChannelClosed);
+        assert!(matches!(cell.get().unwrap_err(), Error::ChannelClosed));
         handle.join().unwrap();
     }
 
     #[test]
     fn test_datacell_try_get() {
         let cell: DataCell<_> = DataCell::new();
-        assert_eq!(cell.try_get().unwrap_err(), Error::ChannelEmpty);
+        assert!(matches!(cell.try_get().unwrap_err(), Error::ChannelEmpty));
         let cell2 = cell.clone();
         let handle = thread::spawn(move || {
             cell2.set(42);

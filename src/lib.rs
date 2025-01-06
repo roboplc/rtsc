@@ -23,6 +23,8 @@ pub use parking_lot_rt as locking;
 pub use pi as locking;
 /// Semaphore
 pub mod semaphore;
+/// System tools
+pub mod system;
 /// Time tools
 pub mod time;
 /// Timestamps
@@ -45,7 +47,7 @@ pub use base_channel::DataChannel;
 pub use rtsc_derive::DataPolicy;
 
 /// Error type
-#[derive(thiserror::Error, Debug, PartialEq, Eq)]
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
     /// the channel is full and the value can not be sent
     #[error("channel full")]
@@ -75,6 +77,9 @@ pub enum Error {
     /// System call or internal API access denied
     #[error("access denied")]
     AccessDenied,
+    /// I/O errors
+    #[error("I/O error: {0}")]
+    IO(#[from] std::io::Error),
 }
 
 /// Result type
