@@ -43,7 +43,7 @@ pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
             )
             .arg(tid.to_string())
             .status()
-            .map_err(|e| Error::RTSchedSetAffinity(e))?;
+            .map_err(|e| Error::RTSchedSetAffinity(e.to_string()))?;
         if !result.success() {
             return Err(Error::RTSchedSetAffinity(format!(
                 "taskset exit code {}",
@@ -68,7 +68,7 @@ pub fn apply(tid: libc::c_int, params: &Params) -> Result<()> {
             .arg(priority.to_string())
             .arg(tid.to_string())
             .status()
-            .map_err(|e| Error::RTSchedSetScheduler(e))?;
+            .map_err(|e| Error::RTSchedSetScheduler(e.to_string()))?;
         if !result.success() {
             return Err(Error::RTSchedSetScheduler(format!(
                 "chrt exit code {}",
