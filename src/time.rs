@@ -1,4 +1,4 @@
-use std::{thread, time::Duration};
+use std::{num::Wrapping, thread, time::Duration};
 
 use bma_ts::Monotonic;
 
@@ -42,6 +42,7 @@ pub struct Interval {
     next_tick: Option<Monotonic>,
     period: Duration,
     missing_tick_behavior: MissedTickBehavior,
+    ticks: Wrapping<usize>,
 }
 
 impl Iterator for Interval {
@@ -59,12 +60,14 @@ impl Interval {
             next_tick: None,
             period,
             missing_tick_behavior: <_>::default(),
+            ticks: Wrapping(0),
         }
     }
     /// Ticks the interval
     ///
     /// Returns false if a tick is missed
     pub fn tick(&mut self) -> bool {
+        self.ticks += Wrapping(1);
         let now = Monotonic::now();
         if let Some(mut next_tick) = self.next_tick {
             match now.cmp(&next_tick) {
@@ -97,6 +100,11 @@ impl Interval {
             self.next_tick = Some(now + self.period);
             true
         }
+    }
+    /// Returns the number of ticks elapsed. If a tick is skipped, the counter is not incremented.
+    /// In case if the tick counter reaches `usize::MAX`, it is reset to zero
+    pub fn elapsed_ticks(&self) -> usize {
+        self.ticks.0
     }
     /// Sets missing tick behavior policy. Can be used as a build pattern
     pub fn set_missing_tick_behavior(mut self, missing_tick_behavior: MissedTickBehavior) -> Self {
@@ -139,5 +147,14 @@ mod test {
         let third = Monotonic::now();
         assert!(Duration::from_millis(100).fits(&[first, second, third]));
         assert!(Duration::from_millis(25).fits(&[first, second, third]));
+    }
+
+    #[test]
+    fn test_ticks() {
+        let mut int = super::interval(Duration::from_millis(10));
+        for _ in 0..3 {
+            int.tick();
+        }
+        assert_eq!(int.elapsed_ticks(), 3);
     }
 }
