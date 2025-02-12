@@ -1,10 +1,18 @@
 use std::{collections::BTreeMap, fmt, ops::Sub};
 
 /// A map which contains events happened at some key points.
-#[derive(Default)]
 pub struct EventMap<K, V, D> {
     data: BTreeMap<K, V>,
     max_delta: Option<D>,
+}
+
+impl<K, V, D> Default for EventMap<K, V, D> {
+    fn default() -> Self {
+        Self {
+            data: BTreeMap::new(),
+            max_delta: None,
+        }
+    }
 }
 
 impl<K, V, D> fmt::Debug for EventMap<K, V, D>
@@ -81,10 +89,7 @@ where
 {
     /// Creates a new empty event map.
     pub fn new() -> Self {
-        EventMap {
-            data: BTreeMap::new(),
-            max_delta: None,
-        }
+        Self::default()
     }
     /// Limits the maximum delta between the requested key and the event key point.
     pub fn with_max_delta(mut self, max_delta: D) -> Self {
@@ -173,7 +178,7 @@ mod test {
 
     #[test]
     fn test_event_map() {
-        let mut event_map = super::EventMap::new();
+        let mut event_map = super::EventMap::default();
         event_map.insert(1, "a");
         event_map.insert(3, "b");
         event_map.insert(7, "d");
