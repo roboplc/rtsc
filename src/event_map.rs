@@ -154,9 +154,13 @@ where
     pub fn clear(&mut self) {
         self.data.clear();
     }
-    /// Removes the event at the specified key point.
-    pub fn remove(&mut self, key: K) -> Option<V> {
-        self.data.remove(&key)
+    /// Get event data map.
+    pub fn data(&self) -> &BTreeMap<K, V> {
+        &self.data
+    }
+    /// Get mutable event data map.
+    pub fn data_mut(&mut self) -> &mut BTreeMap<K, V> {
+        &mut self.data
     }
 }
 
