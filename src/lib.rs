@@ -10,6 +10,8 @@ pub mod channel;
 pub mod channel_async;
 /// Data policies
 pub mod data_policy;
+/// Event map
+pub mod event_map;
 /// Priority-inverting-safe locking (Linux only)
 #[cfg(target_os = "linux")]
 pub mod pi;
