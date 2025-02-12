@@ -2,18 +2,21 @@ use std::{collections::BTreeMap, fmt, ops::Sub};
 
 /// A map which contains events happened at some key points.
 #[derive(Default)]
-pub struct EventMap<K, V> {
+pub struct EventMap<K, V, D> {
     data: BTreeMap<K, V>,
+    max_delta: Option<D>,
 }
 
-impl<K, V> fmt::Debug for EventMap<K, V>
+impl<K, V, D> fmt::Debug for EventMap<K, V, D>
 where
     K: fmt::Debug,
     V: fmt::Debug,
+    D: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EventMap")
             .field("data", &self.data)
+            .field("max_delta", &self.max_delta)
             .finish()
     }
 }
@@ -71,7 +74,7 @@ struct EventKey<K, D> {
     delta: D,
 }
 
-impl<K, V, D> EventMap<K, V>
+impl<K, V, D> EventMap<K, V, D>
 where
     K: Clone + Ord + Sub<Output = D>,
     D: PartialOrd,
@@ -80,14 +83,20 @@ where
     pub fn new() -> Self {
         EventMap {
             data: BTreeMap::new(),
+            max_delta: None,
         }
+    }
+    /// Limits the maximum delta between the requested key and the event key point.
+    pub fn with_max_delta(mut self, max_delta: D) -> Self {
+        self.max_delta = Some(max_delta);
+        self
     }
     /// Inserts a new event at the specified key point.
     pub fn insert(&mut self, key: K, value: V) {
         self.data.insert(key, value);
     }
     /// Gets the most closest event to the specified key point.
-    pub fn get_closest_to(&mut self, key: K) -> Option<EventValue<K, D, V>> {
+    pub fn get_closest_to(&self, key: K) -> Option<EventValue<K, D, V>> {
         let lower: Option<K> = self
             .data
             .range(..=key.clone())
@@ -126,6 +135,13 @@ where
             }),
             (None, None) => None,
         };
+        if let Some(ref max_delta) = self.max_delta {
+            if let Some(ref closest) = closest {
+                if closest.delta > *max_delta {
+                    return None;
+                }
+            }
+        }
         closest.and_then(|closest| {
             self.data.get(&closest.key).map(|value| EventValue {
                 key: closest.key,
@@ -141,5 +157,52 @@ where
     /// Removes the event at the specified key point.
     pub fn remove(&mut self, key: K) -> Option<V> {
         self.data.remove(&key)
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    #[test]
+    fn test_event_map() {
+        let mut event_map = super::EventMap::new();
+        event_map.insert(1, "a");
+        event_map.insert(3, "b");
+        event_map.insert(7, "d");
+        event_map.insert(9, "e");
+        let event = event_map.get_closest_to(4).unwrap();
+        assert_eq!(event.key(), 3);
+        assert_eq!(event.value(), &"b");
+        assert_eq!(event.delta(), 1);
+        let event = event_map.get_closest_to(5).unwrap();
+        assert_eq!(event.key(), 3);
+        assert_eq!(event.value(), &"b");
+        assert_eq!(event.delta(), 2);
+        let event = event_map.get_closest_to(6).unwrap();
+        assert_eq!(event.key(), 7);
+        assert_eq!(event.value(), &"d");
+        assert_eq!(event.delta(), 1);
+        let event = event_map.get_closest_to(10).unwrap();
+        assert_eq!(event.key(), 9);
+        assert_eq!(event.value(), &"e");
+        assert_eq!(event.delta(), 1);
+        let event = event_map.get_closest_to(100).unwrap();
+        assert_eq!(event.key(), 9);
+        assert_eq!(event.value(), &"e");
+        assert_eq!(event.delta(), 91);
+        event_map = event_map.with_max_delta(91);
+        let event = event_map.get_closest_to(100).unwrap();
+        assert_eq!(event.key(), 9);
+        let event = event_map.get_closest_to(-90).unwrap();
+        assert_eq!(event.key(), 1);
+        assert_eq!(event.value(), &"a");
+        assert_eq!(event.delta(), 91);
+        let event = event_map.get_closest_to(-100);
+        assert!(event.is_none());
+        event_map = event_map.with_max_delta(90);
+        let event = event_map.get_closest_to(-90);
+        assert!(event.is_none());
+        let event = event_map.get_closest_to(100);
+        assert!(event.is_none());
     }
 }
