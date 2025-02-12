@@ -151,8 +151,12 @@ where
         })
     }
     /// Clears the event map.
-    pub fn clear(&mut self) {
+    pub fn clear_all(&mut self) {
         self.data.clear();
+    }
+    /// Cleanup map, deleting events before the specified key point.
+    pub fn cleanup(&mut self, key: K) {
+        self.data = self.data.split_off(&key);
     }
     /// Get event data map.
     pub fn data(&self) -> &BTreeMap<K, V> {
@@ -208,5 +212,8 @@ mod test {
         assert!(event.is_none());
         let event = event_map.get_closest_to(100);
         assert!(event.is_none());
+        assert_eq!(event_map.data().len(), 4);
+        event_map.cleanup(7);
+        assert_eq!(event_map.data().len(), 2);
     }
 }
