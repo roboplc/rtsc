@@ -30,13 +30,13 @@ where
 }
 
 /// Event value
-pub struct EventValue<'a, K, D, V> {
+pub struct EventValue<'a, K, V, D> {
     key: K,
     value: &'a V,
     delta: D,
 }
 
-impl<K, D, V> EventValue<'_, K, D, V>
+impl<K, V, D> EventValue<'_, K, V, D>
 where
     K: Clone,
     D: Clone,
@@ -101,7 +101,7 @@ where
         self.data.insert(key, value);
     }
     /// Gets the most closest event to the specified key point.
-    pub fn get_closest_to(&self, key: K) -> Option<EventValue<K, D, V>> {
+    pub fn get_closest_to(&self, key: K) -> Option<EventValue<K, V, D>> {
         let lower: Option<K> = self
             .data
             .range(..=key.clone())
