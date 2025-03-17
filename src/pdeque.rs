@@ -147,3 +147,57 @@ fn sort_by_priority<T: DataDeliveryPolicy>(v: &mut VecDeque<T>) {
         .0
         .sort_by(|a, b| a.priority().partial_cmp(&b.priority()).unwrap());
 }
+
+#[cfg(test)]
+mod test {
+    use super::Deque;
+    use crate::data_policy::{DataDeliveryPolicy, StorageTryPushOutput};
+
+    struct Data {
+        id: u32,
+        value: f64,
+    }
+
+    impl DataDeliveryPolicy for Data {
+        fn delivery_policy(&self) -> crate::data_policy::DeliveryPolicy {
+            crate::data_policy::DeliveryPolicy::Single
+        }
+
+        fn priority(&self) -> usize {
+            100
+        }
+
+        fn eq_kind(&self, other: &Self) -> bool {
+            self.id == other.id
+        }
+
+        fn is_expired(&self) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn test_dp_single() {
+        let mut d: Deque<Data> = Deque::bounded(2);
+        assert!(matches!(
+            d.try_push(Data { id: 1, value: 1.0 }),
+            StorageTryPushOutput::Pushed
+        ));
+        assert!(matches!(
+            d.try_push(Data { id: 2, value: 2.0 }),
+            StorageTryPushOutput::Pushed
+        ));
+        assert!(matches!(
+            d.try_push(Data { id: 1, value: 3.0 }),
+            StorageTryPushOutput::Pushed
+        ));
+        assert_eq!(d.len(), 2);
+        let v1 = d.get().unwrap();
+        assert_eq!(v1.id, 2);
+        assert_eq!(v1.value, 2.0);
+        let v2 = d.get().unwrap();
+        assert_eq!(v2.id, 1);
+        assert_eq!(v2.value, 3.0);
+        assert!(d.get().is_none());
+    }
+}
