@@ -62,11 +62,11 @@ where
     }
 }
 
-impl<K, D, V> fmt::Debug for EventValue<'_, K, D, V>
+impl<K, V, D> fmt::Debug for EventValue<'_, K, V, D>
 where
     K: fmt::Debug,
-    D: fmt::Debug,
     V: fmt::Debug,
+    D: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("EventValue")
