@@ -111,6 +111,11 @@ impl Interval {
         self.missing_tick_behavior = missing_tick_behavior;
         self
     }
+
+    /// Returns the period of the interval.
+    pub fn period(&self) -> Duration {
+        self.period
+    }
 }
 
 /// Interval missing tick behavior
