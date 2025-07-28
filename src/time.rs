@@ -36,6 +36,11 @@ pub fn interval(period: Duration) -> Interval {
     Interval::new(period)
 }
 
+/// Creates a new [`Interval`] with the specified frequency
+pub fn interval_hz(frequency: u64) -> Interval {
+    Interval::new(Duration::from_nanos(1_000_000_000 / frequency))
+}
+
 /// A synchronous interval helper, similar to
 /// <https://docs.rs/tokio/latest/tokio/time/struct.Interval.html>
 pub struct Interval {
