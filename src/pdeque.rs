@@ -177,6 +177,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::float_cmp)]
     fn test_dp_single() {
         let mut d: Deque<Data> = Deque::bounded(2);
         assert!(matches!(
