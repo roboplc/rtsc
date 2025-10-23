@@ -102,7 +102,7 @@ impl<T> TtlCell<T> {
         &'a self,
         other: &'a TtlCell<O>,
         max_time_delta: Duration,
-    ) -> Option<(&T, &O)> {
+    ) -> Option<(&'a T, &'a O)> {
         let maybe_first = self.as_ref();
         let maybe_second = other.as_ref();
         if let Some(first) = maybe_first {
