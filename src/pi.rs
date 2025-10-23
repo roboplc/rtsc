@@ -76,7 +76,7 @@ impl Condvar {
             unlock!();
             loop {
                 let Some(remaining) = timeout.checked_sub(now.elapsed()) else {
-                    break WaitTimeoutResult::new(true)
+                    break WaitTimeoutResult::new(true);
                 };
                 match fx.wait_for(0, remaining) {
                     Ok(()) => break WaitTimeoutResult::new(false),
