@@ -269,7 +269,7 @@ unsafe impl RawMutexTimed for PiLock {
         self.try_lock_until(Self::Instant::now() + timeout)
     }
 
-    fn try_lock_until(&self, timeout: Self::Instant) -> bool {
+    fn try_lock_until(&self, ts: Self::Instant) -> bool {
         let tid = tid();
         #[allow(clippy::cast_sign_loss)]
         let locked =
@@ -282,7 +282,7 @@ unsafe impl RawMutexTimed for PiLock {
         }
 
         loop {
-            match self.futex.lock_pi_until(timeout) {
+            match self.futex.lock_pi_until(ts) {
                 Ok(()) => return true,
                 Err(linux_futex::TimedLockError::TryAgain) => (),
                 Err(linux_futex::TimedLockError::TimedOut) => return false,
