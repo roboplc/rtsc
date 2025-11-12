@@ -252,7 +252,7 @@ where
                 .timed_out()
             {
                 return Err(Error::Timeout);
-            };
+            }
         }
     }
     fn try_recv(&self) -> Result<T> {

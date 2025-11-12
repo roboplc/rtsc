@@ -45,7 +45,9 @@ mod test {
 
     #[derive(Debug)]
     enum Message {
+        #[allow(dead_code)]
         Test(usize),
+        #[allow(dead_code)]
         Temperature(f64),
         Spam,
     }

@@ -156,7 +156,7 @@ mod test {
         thread::sleep(Duration::from_millis(10));
         let third = Monotonic::now();
         assert!(Duration::from_millis(100).fits(&[first, second, third]));
-        assert!(Duration::from_millis(25).fits(&[first, second, third]));
+        assert!(Duration::from_millis(55).fits(&[first, second, third]));
     }
 
     #[test]

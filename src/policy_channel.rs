@@ -41,8 +41,14 @@ where
 /// Channel sender
 pub type Sender<T, M, CV> = BaseSender<T, pdeque::Deque<T>, M, CV>;
 
+/// Default platform sender
+pub type DefaultSender<T> = Sender<T, RawMutex, Condvar>;
+
 /// Channel receiver
 pub type Receiver<T, M, CV> = BaseReceiver<T, pdeque::Deque<T>, M, CV>;
+
+/// Default platform receiver
+pub type DefaultReceiver<T> = Receiver<T, RawMutex, Condvar>;
 
 /// Bounded policy channel structure. Used to be destructurized into a sender and a receiver. A
 /// workaround to let the user use the default Mutex and Condvar types if others are not required

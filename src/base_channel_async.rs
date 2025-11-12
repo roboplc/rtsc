@@ -146,7 +146,7 @@ where
         if let Some(pos) = self
             .send_fut_wakers
             .iter()
-            .position(|w| w.as_ref().map_or(false, |(_, i)| *i == id))
+            .position(|w| w.as_ref().is_some_and(|(_, i)| *i == id))
         {
             self.send_fut_wakers.remove(pos);
             self.send_fut_waker_ids.remove(&id);
@@ -208,7 +208,7 @@ where
         if let Some(pos) = self
             .recv_fut_wakers
             .iter()
-            .position(|w| w.as_ref().map_or(false, |(_, i)| *i == id))
+            .position(|w| w.as_ref().is_some_and(|(_, i)| *i == id))
         {
             self.recv_fut_wakers.remove(pos);
             self.recv_fut_waker_ids.remove(&id);
@@ -257,7 +257,7 @@ impl<'a, T: Sized, S: ChannelStorage<T>> PinnedDrop for Send<'a, T, S> {
     }
 }
 
-impl<'a, T, S> Future for Send<'a, T, S>
+impl<T, S> Future for Send<'_, T, S>
 where
     T: Sized,
     S: ChannelStorage<T>,
@@ -443,7 +443,7 @@ struct Recv<'a, T: Sized, S: ChannelStorage<T>> {
     queued: bool,
 }
 
-impl<'a, T: Sized, S: ChannelStorage<T>> Drop for Recv<'a, T, S> {
+impl<T: Sized, S: ChannelStorage<T>> Drop for Recv<'_, T, S> {
     fn drop(&mut self) {
         if self.queued {
             self.channel.0.data.lock().notify_recv_fut_drop(self.id);
@@ -451,7 +451,7 @@ impl<'a, T: Sized, S: ChannelStorage<T>> Drop for Recv<'a, T, S> {
     }
 }
 
-impl<'a, T, S> Future for Recv<'a, T, S>
+impl<T, S> Future for Recv<'_, T, S>
 where
     T: Sized,
     S: ChannelStorage<T>,

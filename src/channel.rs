@@ -48,8 +48,14 @@ where
 /// Channel sender
 pub type Sender<T, M, CV> = BaseSender<T, VecDeque<T>, M, CV>;
 
+/// Channel default platform sender
+pub type DefaultSender<T> = Sender<T, RawMutex, Condvar>;
+
 /// Channel receiver
 pub type Receiver<T, M, CV> = BaseReceiver<T, VecDeque<T>, M, CV>;
+
+/// Channel default platform receiver
+pub type DefaultReceiver<T> = Receiver<T, RawMutex, Condvar>;
 
 /// Bounded channel structure. Used to be destructurized into a sender and a receiver. A workaround
 /// to let the user use the default Mutex and Condvar types if others are not required
