@@ -91,7 +91,7 @@ pub mod linux {
         fn drop(&mut self) {
             for (key, value) in &self.config.prev_values {
                 if let Err(error) = fs::write(format!("/proc/sys/{}", key), value) {
-                    warn!(key, value, %error, "Failed to restore system config");
+                    warn!(%key, %value, %error, "Failed to restore system config");
                 }
             }
         }
