@@ -15,6 +15,18 @@ pub mod event_map;
 /// Priority-inverting-safe locking (Linux only)
 #[cfg(target_os = "linux")]
 pub mod pi;
+#[cfg(not(target_os = "linux"))]
+/// Priority-inverting-safe locking (Linux only)
+pub mod pi {
+    /// Re-exports parking_lot_rt Mutex
+    pub type Mutex<T> = parking_lot_rt::Mutex<T>;
+    /// Re-exports parking_lot_rt Condvar
+    pub type Condvar = parking_lot_rt::Condvar;
+    /// Re-exports parking_lot_rt RawMutex
+    pub type RawMutex = parking_lot_rt::RawMutex;
+    /// Re-exports parking_lot_rt MutexGuard
+    pub type MutexGuard<'a, T> = parking_lot_rt::MutexGuard<'a, T>;
+}
 /// Policy-based sync channel
 pub mod policy_channel;
 /// Policy-based async channel
